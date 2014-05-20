@@ -22,39 +22,82 @@ import org.quartz.spi.JobStore;
 import org.quartz.spi.OperableTrigger;
 import org.quartz.spi.SchedulerSignaler;
 import org.quartz.spi.TriggerFiredResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.core.HazelcastInstance;
 
 public class HazelcastJobStore implements JobStore {
 
+	private final Logger logger = LoggerFactory
+			.getLogger(HazelcastJobStore.class);
+
 	private String instanceName;
+
+	private SchedulerSignaler schedSignaler;
+
+	private volatile boolean schedulerRunning = false;
+
+	private ClassLoadHelper classLoadHelper;
+
+	private long misfireThreshold;
+
+	private HazelcastInstance hazelcastClient;
 
 	public void initialize(ClassLoadHelper loadHelper,
 			SchedulerSignaler signaler) throws SchedulerConfigException {
-		// TODO Auto-generated method stub
 
+		this.schedSignaler = signaler;
+		this.classLoadHelper = loadHelper;
+		ClientConfig clientConfig = new ClientConfig();
+		// ClientNetworkConfig clientNetworkConfig = new ClientNetworkConfig();
+		clientConfig.addAddress("127.0.0.1:5701");
+		hazelcastClient = HazelcastClient.newHazelcastClient(clientConfig);
 	}
 
 	public void schedulerStarted() throws SchedulerException {
+		logger.info("Start HazelcastJobStore [" + instanceName + "]");
 		// TODO Auto-generated method stub
+	}
 
+	public long getMisfireThreshold() {
+		return misfireThreshold;
+	}
+
+	/**
+	 * The number of milliseconds by which a trigger must have missed its
+	 * next-fire-time, in order for it to be considered "misfired" and thus have
+	 * its misfire instruction applied.
+	 * 
+	 * @param misfireThreshold
+	 *            the new misfire threshold
+	 */
+	@SuppressWarnings("UnusedDeclaration")
+	public void setMisfireThreshold(long misfireThreshold) {
+		if (misfireThreshold < 1) {
+			throw new IllegalArgumentException(
+					"Misfire threshold must be larger than 0");
+		}
+		this.misfireThreshold = misfireThreshold;
 	}
 
 	public void schedulerPaused() {
-		// TODO Auto-generated method stub
+		schedulerRunning = false;
 
 	}
 
 	public void schedulerResumed() {
-		// TODO Auto-generated method stub
+		schedulerRunning = true;
 
 	}
 
 	public void shutdown() {
-		// TODO Auto-generated method stub
-
+		hazelcastClient.shutdown();
 	}
 
 	public boolean supportsPersistence() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
@@ -314,7 +357,6 @@ public class HazelcastJobStore implements JobStore {
 
 	public void setInstanceName(String name) {
 		this.instanceName = name;
-
 	}
 
 	public void setThreadPoolSize(int poolSize) {
