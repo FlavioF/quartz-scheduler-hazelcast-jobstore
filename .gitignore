@@ -12,3 +12,8 @@
 hs_err_pid*
 /target
 /bin
+
+/.settings
+/test-output
+.project
+.classpath
