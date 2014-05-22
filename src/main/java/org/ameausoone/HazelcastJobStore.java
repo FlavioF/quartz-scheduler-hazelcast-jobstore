@@ -27,7 +27,9 @@ import org.slf4j.LoggerFactory;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.client.config.ClientNetworkConfig;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
 
 public class HazelcastJobStore implements JobStore {
 
@@ -52,14 +54,15 @@ public class HazelcastJobStore implements JobStore {
 		this.schedSignaler = signaler;
 		this.classLoadHelper = loadHelper;
 		ClientConfig clientConfig = new ClientConfig();
+		ClientNetworkConfig networkConfig = clientConfig.getNetworkConfig();
 		// ClientNetworkConfig clientNetworkConfig = new ClientNetworkConfig();
-		clientConfig.addAddress("127.0.0.1:5701");
+		networkConfig.addAddress("127.0.0.1:5701");
+
 		hazelcastClient = HazelcastClient.newHazelcastClient(clientConfig);
 	}
 
 	public void schedulerStarted() throws SchedulerException {
 		logger.info("Start HazelcastJobStore [" + instanceName + "]");
-		// TODO Auto-generated method stub
 	}
 
 	public long getMisfireThreshold() {
@@ -119,8 +122,25 @@ public class HazelcastJobStore implements JobStore {
 
 	public void storeJob(JobDetail newJob, boolean replaceExisting)
 			throws ObjectAlreadyExistsException, JobPersistenceException {
-		// TODO Auto-generated method stub
+		IMap<JobKey, JobDetail> jobMap = getJobMap();
+		JobKey jobKey = newJob.getKey();
+		if (replaceExisting) {
+			jobMap.put(jobKey, newJob);
+		} else {
+			if (jobMap.containsKey(jobKey)) {
+				throw new ObjectAlreadyExistsException(newJob);
+			} else {
+				jobMap.put(jobKey, newJob);
+			}
+		}
+	}
 
+	/**
+	 * @return Map which contains Jobs
+	 */
+	private IMap<JobKey, JobDetail> getJobMap() {
+		IMap<JobKey, JobDetail> jobMap = hazelcastClient.getMap(instanceName);
+		return jobMap;
 	}
 
 	public void storeJobsAndTriggers(
@@ -132,7 +152,13 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public boolean removeJob(JobKey jobKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
+		IMap<JobKey, JobDetail> jobMap = getJobMap();
+
+		boolean containsJob = jobMap.containsKey(jobKey);
+		if (containsJob) {
+			jobMap.remove(jobKey);
+			return true;
+		}
 		return false;
 	}
 
@@ -143,8 +169,8 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public JobDetail retrieveJob(JobKey jobKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		IMap<JobKey, JobDetail> iMap = getJobMap();
+		return iMap.get(jobKey);
 	}
 
 	public void storeTrigger(OperableTrigger newTrigger, boolean replaceExisting)
