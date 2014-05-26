@@ -3,7 +3,11 @@ package org.ameausoone;
 import static org.fest.assertions.Assertions.assertThat;
 
 import java.util.Date;
+import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
+
+import org.fest.assertions.Assertions;
 import org.quartz.DateBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
@@ -19,12 +23,13 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.ILock;
 
+@Slf4j
 public class TestHazelcastJobStore {
 
 	private HazelcastInstance hazelcastInstance;
@@ -34,34 +39,26 @@ public class TestHazelcastJobStore {
 
 	@SuppressWarnings("deprecation")
 	@BeforeClass
-	public void setUp() throws SchedulerException {
+	public void setUp() throws SchedulerException, InterruptedException {
+		log.info("SetUp");
 		Config config = new Config();
 		config.setProperty("hazelcast.logging.type", "slf4j");
 		hazelcastInstance = Hazelcast.newHazelcastInstance(config);
-		ILock lock = hazelcastInstance.getLock("StartLock");
-		lock.lock();
-		lock.unlock();
-
-		// ClientConfig clientConfig = new ClientConfig();
-		// // ClientNetworkConfig clientNetworkConfig = new
-		// ClientNetworkConfig();
-		// clientConfig.addAddress("127.0.0.1:5701");
-		//
-		// HazelcastInstance hazelcastClient = HazelcastClient
-		// .newHazelcastClient(clientConfig);
+		Thread.sleep(1000);
 
 		this.fSignaler = new SampleSignaler();
 		hazelcastJobStore = createJobStore("jobstore");
 		ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
+		log.debug("Before loadHelper.initialize()");
 		loadHelper.initialize();
 
 		hazelcastJobStore.initialize(loadHelper, this.fSignaler);
 		hazelcastJobStore.setInstanceId("SimpleInstance");
 		hazelcastJobStore.schedulerStarted();
 
-		this.fJobDetail = this.fJobDetail = new JobDetailImpl("job1",
-				"jobGroup1", MyJob.class);
-		this.hazelcastJobStore.storeJob(this.fJobDetail, false);
+		// this.fJobDetail = this.fJobDetail = new JobDetailImpl("job1",
+		// "jobGroup1", MyJob.class);
+		// this.hazelcastJobStore.storeJob(this.fJobDetail, false);
 	}
 
 	protected HazelcastJobStore createJobStore(String name) {
@@ -91,7 +88,7 @@ public class TestHazelcastJobStore {
 	}
 
 	@Test
-	public void deleteJob() throws ObjectAlreadyExistsException,
+	public void testRemoveJob() throws ObjectAlreadyExistsException,
 			JobPersistenceException {
 		JobDetailImpl jobDetailImpl = new JobDetailImpl("job22", "jobGroup22",
 				MyJob.class);
@@ -107,6 +104,44 @@ public class TestHazelcastJobStore {
 		assertThat(retrieveJob).isNull();
 		removeJob = this.hazelcastJobStore.removeJob(jobDetailImpl.getKey());
 		assertThat(removeJob).isFalse();
+	}
+
+	@Test
+	public void testRemoveJobs() throws ObjectAlreadyExistsException,
+			JobPersistenceException {
+		JobDetailImpl jobDetailImpl = new JobDetailImpl("job24", "jobGroup24",
+				MyJob.class);
+		JobDetailImpl jobDetailImpl2 = new JobDetailImpl("job25", "jobGroup24",
+				MyJob.class);
+		this.hazelcastJobStore.storeJob(jobDetailImpl, false);
+		this.hazelcastJobStore.storeJob(jobDetailImpl2, false);
+		JobDetail retrieveJob = this.hazelcastJobStore.retrieveJob(new JobKey(
+				"job24", "jobGroup24"));
+		assertThat(retrieveJob).isNotNull();
+		List<JobKey> jobKeyList = Lists.newArrayList(jobDetailImpl.getKey(),
+				jobDetailImpl2.getKey());
+		boolean removeJob = this.hazelcastJobStore.removeJobs(jobKeyList);
+		assertThat(removeJob).isTrue();
+		retrieveJob = this.hazelcastJobStore.retrieveJob(new JobKey("job24",
+				"jobGroup24"));
+		assertThat(retrieveJob).isNull();
+		retrieveJob = this.hazelcastJobStore.retrieveJob(new JobKey("job25",
+				"jobGroup24"));
+		assertThat(retrieveJob).isNull();
+		removeJob = this.hazelcastJobStore.removeJob(jobDetailImpl.getKey());
+		assertThat(removeJob).isFalse();
+		removeJob = this.hazelcastJobStore.removeJob(jobDetailImpl2.getKey());
+		assertThat(removeJob).isFalse();
+	}
+
+	@Test
+	public void testCheckExistsJob() throws JobPersistenceException {
+		JobDetailImpl jobDetailImpl = new JobDetailImpl("job23", "jobGroup23",
+				MyJob.class);
+		this.hazelcastJobStore.storeJob(jobDetailImpl, false);
+		boolean checkExists = hazelcastJobStore.checkExists(jobDetailImpl
+				.getKey());
+		Assertions.assertThat(checkExists).isTrue();
 	}
 
 	@SuppressWarnings("deprecation")

@@ -14,12 +14,12 @@
 			<groupId>com.hazelcast</groupId>
 			<artifactId>hazelcast</artifactId>
 			<scope>test</scope>
-			<version>3.2</version>
+			<version>3.2.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.hazelcast</groupId>
 			<artifactId>hazelcast-client</artifactId>
-			<version>3.2</version>
+			<version>3.2.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.testng</groupId>
@@ -43,6 +43,12 @@
 			<groupId>org.easytesting</groupId>
 			<artifactId>fest-assert</artifactId>
 			<version>1.4</version>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.12.6</version>
+			<scope>provided</scope>
 		</dependency>
 	</dependencies>
 	<build></build>
