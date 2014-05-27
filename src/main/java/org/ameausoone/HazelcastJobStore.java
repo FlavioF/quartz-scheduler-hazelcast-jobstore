@@ -37,9 +37,14 @@ import com.hazelcast.core.IMap;
 public class HazelcastJobStore implements JobStore {
 
 	/**
-	 * Suffix to identify job's map in hazelcast memory.
+	 * Suffix to identify job's map in Hazelcast storage.
 	 */
-	private static final String JOB_MAP = "-JobMap";
+	private static final String JOB_MAP_KEY = "-JobMap";
+
+	/**
+	 * Suffix to identify trigger's map in Hazelcast storage.
+	 */
+	private static final String TRIGGER_MAP_KEY = "-TriggerMap";
 
 	private final Logger logger = LoggerFactory
 			.getLogger(HazelcastJobStore.class);
@@ -150,8 +155,17 @@ public class HazelcastJobStore implements JobStore {
 	 */
 	private IMap<JobKey, JobDetail> getJobMap() {
 		IMap<JobKey, JobDetail> jobMap = hazelcastClient.getMap(instanceName
-				+ JOB_MAP);
+				+ JOB_MAP_KEY);
 		return jobMap;
+	}
+
+	/**
+	 * @return Map which contains Jobs.
+	 */
+	private IMap<TriggerKey, Trigger> getTriggerMap() {
+		IMap<TriggerKey, Trigger> triggerMap = hazelcastClient
+				.getMap(instanceName + TRIGGER_MAP_KEY);
+		return triggerMap;
 	}
 
 	public void storeJobsAndTriggers(
@@ -164,13 +178,7 @@ public class HazelcastJobStore implements JobStore {
 
 	public boolean removeJob(JobKey jobKey) throws JobPersistenceException {
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
-
-		boolean containsJob = jobMap.containsKey(jobKey);
-		if (containsJob) {
-			jobMap.remove(jobKey);
-			return true;
-		}
-		return false;
+		return jobMap.remove(jobKey) != null;
 	}
 
 	public boolean removeJobs(List<JobKey> jobKeys)
@@ -192,14 +200,24 @@ public class HazelcastJobStore implements JobStore {
 
 	public void storeTrigger(OperableTrigger newTrigger, boolean replaceExisting)
 			throws ObjectAlreadyExistsException, JobPersistenceException {
-		// TODO Auto-generated method stub
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		TriggerKey triggerKey = newTrigger.getKey();
 
+		if (replaceExisting) {
+			triggerMap.put(triggerKey, newTrigger);
+		} else {
+			if (triggerMap.containsKey(triggerKey)) {
+				throw new ObjectAlreadyExistsException(newTrigger);
+			} else {
+				triggerMap.put(triggerKey, newTrigger);
+			}
+		}
 	}
 
 	public boolean removeTrigger(TriggerKey triggerKey)
 			throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return false;
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		return triggerMap.remove(triggerKey) != null;
 	}
 
 	public boolean removeTriggers(List<TriggerKey> triggerKeys)
@@ -216,8 +234,8 @@ public class HazelcastJobStore implements JobStore {
 
 	public OperableTrigger retrieveTrigger(TriggerKey triggerKey)
 			throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		return (OperableTrigger) triggerMap.get(triggerKey);
 	}
 
 	public boolean checkExists(JobKey jobKey) throws JobPersistenceException {
