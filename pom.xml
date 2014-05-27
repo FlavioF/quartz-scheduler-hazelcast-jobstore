@@ -4,6 +4,20 @@
 	<groupId>org.ameausoone</groupId>
 	<artifactId>quartz-hazelcast-jobstore</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<ciManagement>
+		<system>Jenkins</system>
+		<url>https://kazan.priv.atos.fr/jenkins/1/job/itsm-corporate-pom-ci/</url>
+	</ciManagement>
+	<scm>
+		<connection>scm:git:https://github.com/Ameausoone/workspace</connection>
+		<developerConnection>scm:git:https://github.com/Ameausoone/workspace</developerConnection>
+	</scm>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!-- Compiler -->
+		<maven.compiler.source>1.7</maven.compiler.source>
+		<maven.compiler.target>1.7</maven.compiler.target>
+	</properties>
 	<dependencies>
 		<!-- Core dependencies : Quartz and Hazelcast -->
 		<dependency>
@@ -62,5 +76,18 @@
 			<version>3.2.1</version>
 		</dependency>
 	</dependencies>
-	<build></build>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
+				<configuration>
+					<encoding>${project.build.sourceEncoding}</encoding>
+					<source>${maven.compiler.source}</source>
+					<target>${maven.compiler.target}</target>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 </project>
