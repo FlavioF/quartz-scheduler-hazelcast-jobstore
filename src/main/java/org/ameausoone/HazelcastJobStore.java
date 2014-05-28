@@ -222,8 +222,14 @@ public class HazelcastJobStore implements JobStore {
 
 	public boolean removeTriggers(List<TriggerKey> triggerKeys)
 			throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return false;
+		boolean triggerExists = false;
+		for (TriggerKey triggerKey : triggerKeys) {
+			boolean removetrigger = removeTrigger(triggerKey);
+			if (removetrigger) {
+				triggerExists = true;
+			}
+		}
+		return triggerExists;
 	}
 
 	public boolean replaceTrigger(TriggerKey triggerKey,

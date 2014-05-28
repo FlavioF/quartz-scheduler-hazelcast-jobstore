@@ -4,26 +4,27 @@
 	<groupId>org.ameausoone</groupId>
 	<artifactId>quartz-hazelcast-jobstore</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	
+
 	<ciManagement>
 		<system>Jenkins</system>
 		<url>https://ameausoone.ci.cloudbees.com/job/Hazelcast-Quartz%20jobstore%20CI%20Job/</url>
 	</ciManagement>
-	
+
 	<scm>
-	
+
 		<connection>scm:git:https://github.com/Ameausoone/workspace.git</connection>
 		<developerConnection>scm:git:https://github.com/Ameausoone/workspace.git</developerConnection>
-		 <url>https://github.com/hazelcast/hazelcast/</url>
+		<url>https://github.com/hazelcast/hazelcast/</url>
 	</scm>
-	
+
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<!-- Compiler -->
 		<maven.compiler.source>1.7</maven.compiler.source>
 		<maven.compiler.target>1.7</maven.compiler.target>
+		<hazelcast.version>3.2.1</hazelcast.version>
 	</properties>
-	
+
 	<dependencies>
 		<!-- Core dependencies : Quartz and Hazelcast -->
 		<dependency>
@@ -34,7 +35,12 @@
 		<dependency>
 			<groupId>com.hazelcast</groupId>
 			<artifactId>hazelcast-client</artifactId>
-			<version>3.2.1</version>
+			<version>${hazelcast.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.hazelcast</groupId>
+			<artifactId>hazelcast</artifactId>
+			<version>${hazelcast.version}</version>
 		</dependency>
 		<!-- Logging -->
 		<dependency>
@@ -75,14 +81,9 @@
 			<version>6.8.8</version>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<groupId>com.hazelcast</groupId>
-			<artifactId>hazelcast</artifactId>
-			<scope>test</scope>
-			<version>3.2.1</version>
-		</dependency>
+
 	</dependencies>
-	
+
 	<build>
 		<plugins>
 			<plugin>
@@ -97,5 +98,5 @@
 			</plugin>
 		</plugins>
 	</build>
-	
+
 </project>
