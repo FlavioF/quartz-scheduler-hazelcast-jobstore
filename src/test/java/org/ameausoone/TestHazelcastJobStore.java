@@ -38,6 +38,8 @@ public class TestHazelcastJobStore {
 	private SampleSignaler fSignaler;
 	private JobDetailImpl fJobDetail;
 
+	private int buildTriggerIndex = 0;
+
 	@SuppressWarnings("deprecation")
 	@BeforeClass
 	public void setUp() throws SchedulerException, InterruptedException {
@@ -45,7 +47,6 @@ public class TestHazelcastJobStore {
 		Config config = new Config();
 		config.setProperty("hazelcast.logging.type", "slf4j");
 		hazelcastInstance = Hazelcast.newHazelcastInstance(config);
-		// Thread.sleep(1000);
 
 		this.fSignaler = new SampleSignaler();
 		hazelcastJobStore = createJobStore("jobstore");
@@ -57,7 +58,7 @@ public class TestHazelcastJobStore {
 		hazelcastJobStore.setInstanceId("SimpleInstance");
 		hazelcastJobStore.schedulerStarted();
 
-		this.fJobDetail = this.fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
+		this.fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
 		this.hazelcastJobStore.storeJob(this.fJobDetail, false);
 	}
 
@@ -126,35 +127,30 @@ public class TestHazelcastJobStore {
 	}
 
 	@SuppressWarnings("deprecation")
-	private OperableTrigger buildTrigger(String triggerName, String triggerGroup) {
+	private OperableTrigger buildTrigger() {
 		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
 		long baseFireTime = baseFireTimeDate.getTime();
 
-		OperableTrigger trigger1 = new SimpleTriggerImpl(triggerName, triggerGroup, this.fJobDetail.getName(),
-				this.fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
+		OperableTrigger trigger1 = new SimpleTriggerImpl("triggerName" + buildTriggerIndex++, "triggerGroup1",
+				this.fJobDetail.getName(), this.fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(
+						baseFireTime + 200000), 2, 2000);
 		return trigger1;
 	}
 
 	@Test
 	public void testStoreTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
 
-		@SuppressWarnings("deprecation")
-		OperableTrigger trigger1 = buildTrigger("trigger2", "triggerGroup1");
+		OperableTrigger trigger1 = buildTrigger();
 
 		hazelcastJobStore.storeTrigger(trigger1, false);
 		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(trigger1.getKey());
 		assertThat(retrieveTrigger).isNotNull();
 	}
 
-	@SuppressWarnings("deprecation")
 	@Test(expectedExceptions = { ObjectAlreadyExistsException.class })
 	public void testStoreTriggerThrowsAlreadyExists() throws ObjectAlreadyExistsException, JobPersistenceException {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
 
-		OperableTrigger trigger1 = buildTrigger("trigger3", "triggerGroup1");
+		OperableTrigger trigger1 = buildTrigger();
 
 		hazelcastJobStore.storeTrigger(trigger1, false);
 		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(trigger1.getKey());
@@ -163,13 +159,9 @@ public class TestHazelcastJobStore {
 		retrieveTrigger = hazelcastJobStore.retrieveTrigger(trigger1.getKey());
 	}
 
-	@SuppressWarnings("deprecation")
 	@Test
 	public void testStoreTriggerTwice() throws ObjectAlreadyExistsException, JobPersistenceException {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
-
-		OperableTrigger trigger1 = buildTrigger("trigger4", "triggerGroup1");
+		OperableTrigger trigger1 = buildTrigger();
 
 		hazelcastJobStore.storeTrigger(trigger1, false);
 		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(trigger1.getKey());
@@ -179,13 +171,9 @@ public class TestHazelcastJobStore {
 		assertThat(retrieveTrigger).isNotNull();
 	}
 
-	@SuppressWarnings("deprecation")
 	@Test
 	public void testRemoveTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
-
-		OperableTrigger trigger1 = buildTrigger("trigger5", "triggerGroup1");
+		OperableTrigger trigger1 = buildTrigger();
 		TriggerKey triggerKey = trigger1.getKey();
 		hazelcastJobStore.storeTrigger(trigger1, false);
 		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(trigger1.getKey());
@@ -198,11 +186,10 @@ public class TestHazelcastJobStore {
 		assertThat(removeTrigger).isFalse();
 	}
 
-	@SuppressWarnings("deprecation")
 	@Test
 	public void testRemoveTriggers() throws ObjectAlreadyExistsException, JobPersistenceException {
-		OperableTrigger trigger1 = buildTrigger("trigger6", "triggerGroup1");
-		OperableTrigger trigger2 = buildTrigger("trigger7", "triggerGroup1");
+		OperableTrigger trigger1 = buildTrigger();
+		OperableTrigger trigger2 = buildTrigger();
 
 		hazelcastJobStore.storeTrigger(trigger1, false);
 		hazelcastJobStore.storeTrigger(trigger2, false);
@@ -214,7 +201,7 @@ public class TestHazelcastJobStore {
 
 	@Test
 	public void testTriggerCheckExists() throws ObjectAlreadyExistsException, JobPersistenceException {
-		OperableTrigger trigger1 = buildTrigger("trigger10", "triggerGroup1");
+		OperableTrigger trigger1 = buildTrigger();
 		TriggerKey triggerKey = trigger1.getKey();
 
 		boolean checkExists = hazelcastJobStore.checkExists(triggerKey);
@@ -228,11 +215,11 @@ public class TestHazelcastJobStore {
 
 	@Test
 	public void testReplaceTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
-		OperableTrigger trigger1 = buildTrigger("trigger8", "triggerGroup1");
+		OperableTrigger trigger1 = buildTrigger();
 
 		hazelcastJobStore.storeTrigger(trigger1, false);
 
-		OperableTrigger newTrigger = buildTrigger("trigger9", "triggerGroup1");
+		OperableTrigger newTrigger = buildTrigger();
 
 		TriggerKey triggerKey = trigger1.getKey();
 		boolean replaceTrigger = hazelcastJobStore.replaceTrigger(triggerKey, newTrigger);
