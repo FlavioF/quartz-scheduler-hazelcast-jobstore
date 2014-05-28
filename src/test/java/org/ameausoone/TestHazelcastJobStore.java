@@ -125,6 +125,16 @@ public class TestHazelcastJobStore {
 		Assertions.assertThat(checkExists).isTrue();
 	}
 
+	@SuppressWarnings("deprecation")
+	private OperableTrigger buildTrigger(String triggerName, String triggerGroup) {
+		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
+		long baseFireTime = baseFireTimeDate.getTime();
+
+		OperableTrigger trigger1 = new SimpleTriggerImpl(triggerName, triggerGroup, this.fJobDetail.getName(),
+				this.fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
+		return trigger1;
+	}
+
 	@Test
 	public void testStoreTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
 		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
@@ -203,19 +213,32 @@ public class TestHazelcastJobStore {
 	}
 
 	@Test
+	public void testTriggerCheckExists() throws ObjectAlreadyExistsException, JobPersistenceException {
+		OperableTrigger trigger1 = buildTrigger("trigger10", "triggerGroup1");
+		TriggerKey triggerKey = trigger1.getKey();
+
+		boolean checkExists = hazelcastJobStore.checkExists(triggerKey);
+		assertThat(checkExists).isFalse();
+
+		hazelcastJobStore.storeTrigger(trigger1, false);
+
+		checkExists = hazelcastJobStore.checkExists(triggerKey);
+		assertThat(checkExists).isTrue();
+	}
+
+	@Test
 	public void testReplaceTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
 		OperableTrigger trigger1 = buildTrigger("trigger8", "triggerGroup1");
 
 		hazelcastJobStore.storeTrigger(trigger1, false);
-	}
 
-	private OperableTrigger buildTrigger(String triggerName, String triggerGroup) {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
+		OperableTrigger newTrigger = buildTrigger("trigger9", "triggerGroup1");
 
-		OperableTrigger trigger1 = new SimpleTriggerImpl(triggerName, triggerGroup, this.fJobDetail.getName(),
-				this.fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
-		return trigger1;
+		TriggerKey triggerKey = trigger1.getKey();
+		boolean replaceTrigger = hazelcastJobStore.replaceTrigger(triggerKey, newTrigger);
+		assertThat(replaceTrigger).isTrue();
+		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(triggerKey);
+		assertThat(retrieveTrigger).isEqualTo(newTrigger);
 	}
 
 	@SuppressWarnings("deprecation")

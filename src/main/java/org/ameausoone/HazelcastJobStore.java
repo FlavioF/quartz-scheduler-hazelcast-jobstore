@@ -222,8 +222,10 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public boolean replaceTrigger(TriggerKey triggerKey, OperableTrigger newTrigger) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return false;
+		newTrigger.setKey(triggerKey);
+		boolean checkExists = checkExists(triggerKey);
+		storeTrigger(newTrigger, true);
+		return checkExists;
 	}
 
 	public OperableTrigger retrieveTrigger(TriggerKey triggerKey) throws JobPersistenceException {
@@ -237,8 +239,8 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public boolean checkExists(TriggerKey triggerKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return false;
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		return triggerMap.containsKey(triggerKey);
 	}
 
 	public void clearAllSchedulingData() throws JobPersistenceException {
