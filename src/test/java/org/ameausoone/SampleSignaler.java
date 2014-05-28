@@ -9,8 +9,7 @@ public class SampleSignaler implements SchedulerSignaler {
 	volatile int fMisfireCount = 0;
 
 	public void notifyTriggerListenersMisfired(Trigger trigger) {
-		System.out.println("Trigger misfired: " + trigger.getKey()
-				+ ", fire time: " + trigger.getNextFireTime());
+		System.out.println("Trigger misfired: " + trigger.getKey() + ", fire time: " + trigger.getNextFireTime());
 		fMisfireCount++;
 	}
 
@@ -23,7 +22,6 @@ public class SampleSignaler implements SchedulerSignaler {
 	public void notifySchedulerListenersJobDeleted(JobKey jobKey) {
 	}
 
-	public void notifySchedulerListenersError(String string,
-			SchedulerException jpe) {
+	public void notifySchedulerListenersError(String string, SchedulerException jpe) {
 	}
 }

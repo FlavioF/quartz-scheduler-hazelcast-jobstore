@@ -9,8 +9,7 @@ public class StartHazelcast {
 	public static void main(String[] args) {
 		Config config = new Config();
 		config.setProperty("hazelcast.logging.type", "slf4j");
-		HazelcastInstance newHazelcastInstance = Hazelcast
-				.newHazelcastInstance(config);
+		HazelcastInstance newHazelcastInstance = Hazelcast.newHazelcastInstance(config);
 
 	}
 

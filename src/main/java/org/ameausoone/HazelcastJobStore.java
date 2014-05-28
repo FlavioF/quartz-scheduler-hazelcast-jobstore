@@ -47,8 +47,7 @@ public class HazelcastJobStore implements JobStore {
 	 */
 	private static final String TRIGGER_MAP_KEY = "-TriggerMap";
 
-	private final Logger logger = LoggerFactory
-			.getLogger(HazelcastJobStore.class);
+	private final Logger logger = LoggerFactory.getLogger(HazelcastJobStore.class);
 
 	private String instanceName;
 
@@ -62,8 +61,7 @@ public class HazelcastJobStore implements JobStore {
 
 	private HazelcastInstance hazelcastClient;
 
-	public void initialize(ClassLoadHelper loadHelper,
-			SchedulerSignaler signaler) throws SchedulerConfigException {
+	public void initialize(ClassLoadHelper loadHelper, SchedulerSignaler signaler) throws SchedulerConfigException {
 
 		this.schedSignaler = signaler;
 		this.classLoadHelper = loadHelper;
@@ -85,9 +83,8 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	/**
-	 * The number of milliseconds by which a trigger must have missed its
-	 * next-fire-time, in order for it to be considered "misfired" and thus have
-	 * its misfire instruction applied.
+	 * The number of milliseconds by which a trigger must have missed its next-fire-time, in order for it to be
+	 * considered "misfired" and thus have its misfire instruction applied.
 	 * 
 	 * @param misfireThreshold
 	 *            the new misfire threshold
@@ -95,8 +92,7 @@ public class HazelcastJobStore implements JobStore {
 	@SuppressWarnings("UnusedDeclaration")
 	public void setMisfireThreshold(long misfireThreshold) {
 		if (misfireThreshold < 1) {
-			throw new IllegalArgumentException(
-					"Misfire threshold must be larger than 0");
+			throw new IllegalArgumentException("Misfire threshold must be larger than 0");
 		}
 		this.misfireThreshold = misfireThreshold;
 	}
@@ -129,14 +125,14 @@ public class HazelcastJobStore implements JobStore {
 		return false;
 	}
 
-	public void storeJobAndTrigger(JobDetail newJob, OperableTrigger newTrigger)
-			throws ObjectAlreadyExistsException, JobPersistenceException {
+	public void storeJobAndTrigger(JobDetail newJob, OperableTrigger newTrigger) throws ObjectAlreadyExistsException,
+			JobPersistenceException {
 		// TODO Auto-generated method stub
 
 	}
 
-	public void storeJob(JobDetail newJob, boolean replaceExisting)
-			throws ObjectAlreadyExistsException, JobPersistenceException {
+	public void storeJob(JobDetail newJob, boolean replaceExisting) throws ObjectAlreadyExistsException,
+			JobPersistenceException {
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
 		JobKey jobKey = newJob.getKey();
 		if (replaceExisting) {
@@ -154,8 +150,7 @@ public class HazelcastJobStore implements JobStore {
 	 * @return Map which contains Jobs.
 	 */
 	private IMap<JobKey, JobDetail> getJobMap() {
-		IMap<JobKey, JobDetail> jobMap = hazelcastClient.getMap(instanceName
-				+ JOB_MAP_KEY);
+		IMap<JobKey, JobDetail> jobMap = hazelcastClient.getMap(instanceName + JOB_MAP_KEY);
 		return jobMap;
 	}
 
@@ -163,15 +158,12 @@ public class HazelcastJobStore implements JobStore {
 	 * @return Map which contains Jobs.
 	 */
 	private IMap<TriggerKey, Trigger> getTriggerMap() {
-		IMap<TriggerKey, Trigger> triggerMap = hazelcastClient
-				.getMap(instanceName + TRIGGER_MAP_KEY);
+		IMap<TriggerKey, Trigger> triggerMap = hazelcastClient.getMap(instanceName + TRIGGER_MAP_KEY);
 		return triggerMap;
 	}
 
-	public void storeJobsAndTriggers(
-			Map<JobDetail, Set<? extends Trigger>> triggersAndJobs,
-			boolean replace) throws ObjectAlreadyExistsException,
-			JobPersistenceException {
+	public void storeJobsAndTriggers(Map<JobDetail, Set<? extends Trigger>> triggersAndJobs, boolean replace)
+			throws ObjectAlreadyExistsException, JobPersistenceException {
 		// TODO Auto-generated method stub
 
 	}
@@ -181,8 +173,7 @@ public class HazelcastJobStore implements JobStore {
 		return jobMap.remove(jobKey) != null;
 	}
 
-	public boolean removeJobs(List<JobKey> jobKeys)
-			throws JobPersistenceException {
+	public boolean removeJobs(List<JobKey> jobKeys) throws JobPersistenceException {
 		boolean jobExists = false;
 		for (JobKey jobKey : jobKeys) {
 			boolean removeJob = removeJob(jobKey);
@@ -198,8 +189,8 @@ public class HazelcastJobStore implements JobStore {
 		return iMap.get(jobKey);
 	}
 
-	public void storeTrigger(OperableTrigger newTrigger, boolean replaceExisting)
-			throws ObjectAlreadyExistsException, JobPersistenceException {
+	public void storeTrigger(OperableTrigger newTrigger, boolean replaceExisting) throws ObjectAlreadyExistsException,
+			JobPersistenceException {
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
 		TriggerKey triggerKey = newTrigger.getKey();
 
@@ -214,14 +205,12 @@ public class HazelcastJobStore implements JobStore {
 		}
 	}
 
-	public boolean removeTrigger(TriggerKey triggerKey)
-			throws JobPersistenceException {
+	public boolean removeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
 		return triggerMap.remove(triggerKey) != null;
 	}
 
-	public boolean removeTriggers(List<TriggerKey> triggerKeys)
-			throws JobPersistenceException {
+	public boolean removeTriggers(List<TriggerKey> triggerKeys) throws JobPersistenceException {
 		boolean triggerExists = false;
 		for (TriggerKey triggerKey : triggerKeys) {
 			boolean removetrigger = removeTrigger(triggerKey);
@@ -232,14 +221,12 @@ public class HazelcastJobStore implements JobStore {
 		return triggerExists;
 	}
 
-	public boolean replaceTrigger(TriggerKey triggerKey,
-			OperableTrigger newTrigger) throws JobPersistenceException {
+	public boolean replaceTrigger(TriggerKey triggerKey, OperableTrigger newTrigger) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	public OperableTrigger retrieveTrigger(TriggerKey triggerKey)
-			throws JobPersistenceException {
+	public OperableTrigger retrieveTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
 		return (OperableTrigger) triggerMap.get(triggerKey);
 	}
@@ -249,8 +236,7 @@ public class HazelcastJobStore implements JobStore {
 		return jobMap.containsKey(jobKey);
 	}
 
-	public boolean checkExists(TriggerKey triggerKey)
-			throws JobPersistenceException {
+	public boolean checkExists(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return false;
 	}
@@ -260,21 +246,18 @@ public class HazelcastJobStore implements JobStore {
 
 	}
 
-	public void storeCalendar(String name, Calendar calendar,
-			boolean replaceExisting, boolean updateTriggers)
+	public void storeCalendar(String name, Calendar calendar, boolean replaceExisting, boolean updateTriggers)
 			throws ObjectAlreadyExistsException, JobPersistenceException {
 		// TODO Auto-generated method stub
 
 	}
 
-	public boolean removeCalendar(String calName)
-			throws JobPersistenceException {
+	public boolean removeCalendar(String calName) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	public Calendar retrieveCalendar(String calName)
-			throws JobPersistenceException {
+	public Calendar retrieveCalendar(String calName) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -294,14 +277,12 @@ public class HazelcastJobStore implements JobStore {
 		return 0;
 	}
 
-	public Set<JobKey> getJobKeys(GroupMatcher<JobKey> matcher)
-			throws JobPersistenceException {
+	public Set<JobKey> getJobKeys(GroupMatcher<JobKey> matcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public Set<TriggerKey> getTriggerKeys(GroupMatcher<TriggerKey> matcher)
-			throws JobPersistenceException {
+	public Set<TriggerKey> getTriggerKeys(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -321,26 +302,22 @@ public class HazelcastJobStore implements JobStore {
 		return null;
 	}
 
-	public List<OperableTrigger> getTriggersForJob(JobKey jobKey)
-			throws JobPersistenceException {
+	public List<OperableTrigger> getTriggersForJob(JobKey jobKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public TriggerState getTriggerState(TriggerKey triggerKey)
-			throws JobPersistenceException {
+	public TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public void pauseTrigger(TriggerKey triggerKey)
-			throws JobPersistenceException {
+	public void pauseTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 
 	}
 
-	public Collection<String> pauseTriggers(GroupMatcher<TriggerKey> matcher)
-			throws JobPersistenceException {
+	public Collection<String> pauseTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -350,20 +327,17 @@ public class HazelcastJobStore implements JobStore {
 
 	}
 
-	public Collection<String> pauseJobs(GroupMatcher<JobKey> groupMatcher)
-			throws JobPersistenceException {
+	public Collection<String> pauseJobs(GroupMatcher<JobKey> groupMatcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public void resumeTrigger(TriggerKey triggerKey)
-			throws JobPersistenceException {
+	public void resumeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 
 	}
 
-	public Collection<String> resumeTriggers(GroupMatcher<TriggerKey> matcher)
-			throws JobPersistenceException {
+	public Collection<String> resumeTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -378,8 +352,7 @@ public class HazelcastJobStore implements JobStore {
 
 	}
 
-	public Collection<String> resumeJobs(GroupMatcher<JobKey> matcher)
-			throws JobPersistenceException {
+	public Collection<String> resumeJobs(GroupMatcher<JobKey> matcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -394,8 +367,8 @@ public class HazelcastJobStore implements JobStore {
 
 	}
 
-	public List<OperableTrigger> acquireNextTriggers(long noLaterThan,
-			int maxCount, long timeWindow) throws JobPersistenceException {
+	public List<OperableTrigger> acquireNextTriggers(long noLaterThan, int maxCount, long timeWindow)
+			throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -405,14 +378,13 @@ public class HazelcastJobStore implements JobStore {
 
 	}
 
-	public List<TriggerFiredResult> triggersFired(List<OperableTrigger> triggers)
-			throws JobPersistenceException {
+	public List<TriggerFiredResult> triggersFired(List<OperableTrigger> triggers) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public void triggeredJobComplete(OperableTrigger trigger,
-			JobDetail jobDetail, CompletedExecutionInstruction triggerInstCode) {
+	public void triggeredJobComplete(OperableTrigger trigger, JobDetail jobDetail,
+			CompletedExecutionInstruction triggerInstCode) {
 		// TODO Auto-generated method stub
 
 	}

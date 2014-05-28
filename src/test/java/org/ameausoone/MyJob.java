@@ -6,8 +6,7 @@ import org.quartz.JobExecutionException;
 
 /** An empty job for testing purpose. */
 public class MyJob implements Job {
-	public void execute(JobExecutionContext context)
-			throws JobExecutionException {
+	public void execute(JobExecutionContext context) throws JobExecutionException {
 		//
 	}
 }
