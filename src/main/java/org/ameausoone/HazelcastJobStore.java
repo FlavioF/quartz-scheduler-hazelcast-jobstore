@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.client.config.ClientNetworkConfig;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 
@@ -68,10 +69,10 @@ public class HazelcastJobStore implements JobStore {
 		this.classLoadHelper = loadHelper;
 		System.setProperty("hazelcast.logging.type", "slf4j");
 		ClientConfig clientConfig = new ClientConfig();
-		clientConfig.addAddress("127.0.0.1:5701");
-		// ClientNetworkConfig networkConfig = clientConfig.getNetworkConfig();
-		// ClientNetworkConfig clientNetworkConfig = new ClientNetworkConfig();
-		// networkConfig.addAddress("127.0.0.1:5701");
+		// clientConfig.addAddress("127.0.0.1:5701");
+		ClientNetworkConfig networkConfig = clientConfig.getNetworkConfig();
+		ClientNetworkConfig clientNetworkConfig = new ClientNetworkConfig();
+		clientNetworkConfig.addAddress("127.0.0.1:5701");
 
 		hazelcastClient = HazelcastClient.newHazelcastClient(clientConfig);
 	}

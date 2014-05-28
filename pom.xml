@@ -4,20 +4,26 @@
 	<groupId>org.ameausoone</groupId>
 	<artifactId>quartz-hazelcast-jobstore</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	
 	<ciManagement>
 		<system>Jenkins</system>
-		<url>https://kazan.priv.atos.fr/jenkins/1/job/itsm-corporate-pom-ci/</url>
+		<url>https://ameausoone.ci.cloudbees.com/job/Hazelcast-Quartz%20jobstore%20CI%20Job/</url>
 	</ciManagement>
+	
 	<scm>
-		<connection>scm:git:https://github.com/Ameausoone/workspace</connection>
-		<developerConnection>scm:git:https://github.com/Ameausoone/workspace</developerConnection>
+	
+		<connection>scm:git:https://github.com/Ameausoone/workspace.git</connection>
+		<developerConnection>scm:git:https://github.com/Ameausoone/workspace.git</developerConnection>
+		 <url>https://github.com/hazelcast/hazelcast/</url>
 	</scm>
+	
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<!-- Compiler -->
 		<maven.compiler.source>1.7</maven.compiler.source>
 		<maven.compiler.target>1.7</maven.compiler.target>
 	</properties>
+	
 	<dependencies>
 		<!-- Core dependencies : Quartz and Hazelcast -->
 		<dependency>
@@ -76,6 +82,7 @@
 			<version>3.2.1</version>
 		</dependency>
 	</dependencies>
+	
 	<build>
 		<plugins>
 			<plugin>
@@ -90,4 +97,5 @@
 			</plugin>
 		</plugins>
 	</build>
+	
 </project>
