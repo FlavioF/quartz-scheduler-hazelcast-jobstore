@@ -251,6 +251,10 @@ public class TestHazelcastJobStore {
 				trigger2.getKey());
 		boolean removeTriggers = hazelcastJobStore.removeTriggers(triggerKeys);
 		assertThat(removeTriggers).isTrue();
+	}
+
+	@Test
+	public void testReplaceTrigger() {
 
 	}
 
