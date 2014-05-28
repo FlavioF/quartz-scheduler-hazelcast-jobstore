@@ -71,8 +71,7 @@ public class HazelcastJobStore implements JobStore {
 		ClientConfig clientConfig = new ClientConfig();
 		// clientConfig.addAddress("127.0.0.1:5701");
 		ClientNetworkConfig networkConfig = clientConfig.getNetworkConfig();
-		ClientNetworkConfig clientNetworkConfig = new ClientNetworkConfig();
-		clientNetworkConfig.addAddress("127.0.0.1:5701");
+		networkConfig.addAddress("127.0.0.1:5701");
 
 		hazelcastClient = HazelcastClient.newHazelcastClient(clientConfig);
 	}
