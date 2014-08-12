@@ -1,6 +1,11 @@
 package org.ameausoone;
 
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Sets.newHashSet;
+
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +22,7 @@ import org.quartz.Trigger.CompletedExecutionInstruction;
 import org.quartz.Trigger.TriggerState;
 import org.quartz.TriggerKey;
 import org.quartz.impl.matchers.GroupMatcher;
+import org.quartz.impl.matchers.StringMatcher;
 import org.quartz.spi.ClassLoadHelper;
 import org.quartz.spi.JobStore;
 import org.quartz.spi.OperableTrigger;
@@ -24,12 +30,14 @@ import org.quartz.spi.SchedulerSignaler;
 import org.quartz.spi.TriggerFiredResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.terracotta.quartz.wrappers.JobWrapper;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.config.ClientNetworkConfig;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
+import com.hazelcast.core.MultiMap;
 
 /**
  * @author Antoine Méausoone
@@ -42,6 +50,7 @@ public class HazelcastJobStore implements JobStore {
 	 */
 	private static final String JOB_MAP_KEY = "-JobMap";
 
+	private static final String JOBKEY_BY_GROUP_MAP_KEY = "-JobByGroupMap";
 	/**
 	 * Suffix to identify trigger's map in Hazelcast storage.
 	 */
@@ -143,6 +152,7 @@ public class HazelcastJobStore implements JobStore {
 			throw new ObjectAlreadyExistsException(newJob);
 		} else {
 			jobMap.put(jobKey, newJob);
+			getJobKeyByGroupMap().put(jobKey.getGroup(), jobKey);
 		}
 	}
 
@@ -150,16 +160,18 @@ public class HazelcastJobStore implements JobStore {
 	 * @return Map which contains Jobs.
 	 */
 	private IMap<JobKey, JobDetail> getJobMap() {
-		IMap<JobKey, JobDetail> jobMap = hazelcastClient.getMap(instanceName + JOB_MAP_KEY);
-		return jobMap;
+		return hazelcastClient.getMap(instanceName + JOB_MAP_KEY);
+	}
+
+	private MultiMap<String, JobKey> getJobKeyByGroupMap() {
+		return hazelcastClient.getMultiMap(instanceName + JOBKEY_BY_GROUP_MAP_KEY);
 	}
 
 	/**
 	 * @return Map which contains Jobs.
 	 */
 	private IMap<TriggerKey, Trigger> getTriggerMap() {
-		IMap<TriggerKey, Trigger> triggerMap = hazelcastClient.getMap(instanceName + TRIGGER_MAP_KEY);
-		return triggerMap;
+		return hazelcastClient.getMap(instanceName + TRIGGER_MAP_KEY);
 	}
 
 	public void storeJobsAndTriggers(Map<JobDetail, Set<? extends Trigger>> triggersAndJobs, boolean replace)
@@ -170,6 +182,7 @@ public class HazelcastJobStore implements JobStore {
 
 	public boolean removeJob(JobKey jobKey) throws JobPersistenceException {
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
+		getJobKeyByGroupMap().remove(jobKey.getGroup(), jobKey);
 		return jobMap.remove(jobKey) != null;
 	}
 
@@ -240,7 +253,20 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void clearAllSchedulingData() throws JobPersistenceException {
-		getJobMap()
+		IMap<JobKey, JobDetail> jobMap = getJobMap();
+		for (JobKey jobKey : jobMap.keySet()) {
+			removeJob(jobKey);
+		}
+
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		for (TriggerKey triggerKey : triggerMap.keySet()) {
+			removeTrigger(triggerKey);
+		}
+
+		IMap<String, Calendar> calendarMap = getCalendarMap();
+		for (String calName : calendarMap.keySet()) {
+			removeCalendar(calName);
+		}
 
 	}
 
@@ -265,8 +291,9 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public boolean removeCalendar(String calName) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return false;
+		// TODO implement
+		// "If removal of the Calendar would result in Triggers pointing to non-existent calendars, then a JobPersistenceException will be thrown."
+		return getCalendarMap().remove(calName) != null;
 	}
 
 	public Calendar retrieveCalendar(String calName) throws JobPersistenceException {
@@ -275,23 +302,54 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public int getNumberOfJobs() throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return 0;
+		return getJobMap().size();
 	}
 
 	public int getNumberOfTriggers() throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return 0;
+		return getTriggerMap().size();
 	}
 
 	public int getNumberOfCalendars() throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return 0;
+		return getCalendarMap().size();
 	}
 
 	public Set<JobKey> getJobKeys(GroupMatcher<JobKey> matcher) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		Set<JobKey> outList = null;
+
+		StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
+		String compareToValue = matcher.getCompareToValue();
+
+		switch (operator) {
+		case EQUALS:
+
+			if (getJobGroupNames().contains(compareToValue)) {
+				outList = new HashSet<JobKey>();
+
+				for (JobWrapper jw : getjo.values()) {
+
+					if (jw != null) {
+						outList.add(jw.jobDetail.getKey());
+					}
+				}
+			}
+			break;
+
+		default:
+			for (Map.Entry<String, HashMap<JobKey, JobWrapper>> entry : jobsByGroup.entrySet()) {
+				if (operator.evaluate(entry.getKey(), compareToValue) && entry.getValue() != null) {
+					if (outList == null) {
+						outList = new HashSet<JobKey>();
+					}
+					for (JobWrapper jobWrapper : entry.getValue().values()) {
+						if (jobWrapper != null) {
+							outList.add(jobWrapper.jobDetail.getKey());
+						}
+					}
+				}
+			}
+		}
+
+		return outList == null ? java.util.Collections.<JobKey> emptySet() : outList;
 	}
 
 	public Set<TriggerKey> getTriggerKeys(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
@@ -300,18 +358,20 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public List<String> getJobGroupNames() throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		return newArrayList(getJobKeyByGroupMap().keySet());
 	}
 
 	public List<String> getTriggerGroupNames() throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		Set<TriggerKey> triggerKeys = getTriggerMap().keySet();
+		Set<String> groupNames = newHashSet();
+		for (TriggerKey triggerKey : triggerKeys) {
+			groupNames.add(triggerKey.getGroup());
+		}
+		return newArrayList(groupNames);
 	}
 
 	public List<String> getCalendarNames() throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		return newArrayList(getCalendarMap().keySet());
 	}
 
 	public List<OperableTrigger> getTriggersForJob(JobKey jobKey) throws JobPersistenceException {
@@ -376,7 +436,6 @@ public class HazelcastJobStore implements JobStore {
 
 	public void resumeAll() throws JobPersistenceException {
 		// TODO Auto-generated method stub
-
 	}
 
 	public List<OperableTrigger> acquireNextTriggers(long noLaterThan, int maxCount, long timeWindow)
