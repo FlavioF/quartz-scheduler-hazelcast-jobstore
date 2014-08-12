@@ -47,6 +47,8 @@ public class HazelcastJobStore implements JobStore {
 	 */
 	private static final String TRIGGER_MAP_KEY = "-TriggerMap";
 
+	private static final String CALENDAR_MAP_KEY = "-CalendarMap";
+
 	private final Logger logger = LoggerFactory.getLogger(HazelcastJobStore.class);
 
 	private String instanceName;
@@ -127,7 +129,8 @@ public class HazelcastJobStore implements JobStore {
 
 	public void storeJobAndTrigger(JobDetail newJob, OperableTrigger newTrigger) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
-		// TODO Auto-generated method stub
+		storeJob(newJob, false);
+		storeTrigger(newTrigger, false);
 
 	}
 
@@ -135,14 +138,11 @@ public class HazelcastJobStore implements JobStore {
 			JobPersistenceException {
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
 		JobKey jobKey = newJob.getKey();
-		if (replaceExisting) {
-			jobMap.put(jobKey, newJob);
+		boolean containsKey = jobMap.containsKey(jobKey);
+		if (containsKey && !replaceExisting) {
+			throw new ObjectAlreadyExistsException(newJob);
 		} else {
-			if (jobMap.containsKey(jobKey)) {
-				throw new ObjectAlreadyExistsException(newJob);
-			} else {
-				jobMap.put(jobKey, newJob);
-			}
+			jobMap.put(jobKey, newJob);
 		}
 	}
 
@@ -193,15 +193,11 @@ public class HazelcastJobStore implements JobStore {
 			JobPersistenceException {
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
 		TriggerKey triggerKey = newTrigger.getKey();
-
-		if (replaceExisting) {
-			triggerMap.put(triggerKey, newTrigger);
+		boolean containsKey = triggerMap.containsKey(triggerKey);
+		if (containsKey && !replaceExisting) {
+			throw new ObjectAlreadyExistsException(newTrigger);
 		} else {
-			if (triggerMap.containsKey(triggerKey)) {
-				throw new ObjectAlreadyExistsException(newTrigger);
-			} else {
-				triggerMap.put(triggerKey, newTrigger);
-			}
+			triggerMap.put(triggerKey, newTrigger);
 		}
 	}
 
@@ -244,13 +240,27 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void clearAllSchedulingData() throws JobPersistenceException {
-		// TODO Auto-generated method stub
+		getJobMap()
 
 	}
 
-	public void storeCalendar(String name, Calendar calendar, boolean replaceExisting, boolean updateTriggers)
+	/**
+	 * @return Map which contains Jobs.
+	 */
+	private IMap<String, Calendar> getCalendarMap() {
+		IMap<String, Calendar> calendarMap = hazelcastClient.getMap(instanceName + CALENDAR_MAP_KEY);
+		return calendarMap;
+	}
+
+	public void storeCalendar(String calName, Calendar calendar, boolean replaceExisting, boolean updateTriggers)
 			throws ObjectAlreadyExistsException, JobPersistenceException {
-		// TODO Auto-generated method stub
+		IMap<String, Calendar> calendarMap = getCalendarMap();
+		boolean containsKey = calendarMap.containsKey(calName);
+		if (containsKey && !replaceExisting) {
+			throw new ObjectAlreadyExistsException("Calendar with name '" + calName + "' already exists.");
+		} else {
+			calendarMap.put(calName, calendar);
+		}
 
 	}
 
@@ -260,8 +270,8 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public Calendar retrieveCalendar(String calName) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		IMap<String, Calendar> calendarMap = getCalendarMap();
+		return calendarMap.get(calName);
 	}
 
 	public int getNumberOfJobs() throws JobPersistenceException {

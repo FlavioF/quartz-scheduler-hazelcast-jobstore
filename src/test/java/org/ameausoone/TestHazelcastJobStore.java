@@ -8,6 +8,7 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
 import org.fest.assertions.Assertions;
+import org.quartz.Calendar;
 import org.quartz.DateBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
@@ -16,6 +17,7 @@ import org.quartz.ObjectAlreadyExistsException;
 import org.quartz.SchedulerException;
 import org.quartz.TriggerKey;
 import org.quartz.impl.JobDetailImpl;
+import org.quartz.impl.calendar.BaseCalendar;
 import org.quartz.impl.triggers.SimpleTriggerImpl;
 import org.quartz.simpl.CascadingClassLoadHelper;
 import org.quartz.spi.ClassLoadHelper;
@@ -226,6 +228,46 @@ public class TestHazelcastJobStore {
 		assertThat(replaceTrigger).isTrue();
 		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(triggerKey);
 		assertThat(retrieveTrigger).isEqualTo(newTrigger);
+	}
+
+	@Test
+	public void testStoreJobAndTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
+		JobDetailImpl jobDetailImpl = new JobDetailImpl("job30", "jobGroup20", MyJob.class);
+		OperableTrigger trigger1 = buildTrigger();
+		hazelcastJobStore.storeJobAndTrigger(jobDetailImpl, trigger1);
+		JobDetail retrieveJob = hazelcastJobStore.retrieveJob(jobDetailImpl.getKey());
+		assertThat(retrieveJob).isNotNull();
+		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(trigger1.getKey());
+		assertThat(retrieveTrigger).isNotNull();
+	}
+
+	@Test(expectedExceptions = { ObjectAlreadyExistsException.class })
+	public void testStoreJobAndTriggerThrowJobAlreadyExists() throws ObjectAlreadyExistsException,
+			JobPersistenceException {
+		JobDetailImpl jobDetailImpl = new JobDetailImpl("job31", "jobGroup20", MyJob.class);
+		OperableTrigger trigger1 = buildTrigger();
+		hazelcastJobStore.storeJobAndTrigger(jobDetailImpl, trigger1);
+		JobDetail retrieveJob = hazelcastJobStore.retrieveJob(jobDetailImpl.getKey());
+		assertThat(retrieveJob).isNotNull();
+		OperableTrigger retrieveTrigger = hazelcastJobStore.retrieveTrigger(trigger1.getKey());
+		assertThat(retrieveTrigger).isNotNull();
+
+		hazelcastJobStore.storeJobAndTrigger(jobDetailImpl, trigger1);
+	}
+
+	@Test
+	public void storeCalendar() throws ObjectAlreadyExistsException, JobPersistenceException {
+		Calendar calendar = new BaseCalendar();
+		String calName = "calendar";
+		hazelcastJobStore.storeCalendar(calName, calendar, false, false);
+
+		Calendar retrieveCalendar = hazelcastJobStore.retrieveCalendar(calName);
+		assertThat(retrieveCalendar).isNotNull();
+	}
+
+	@Test
+	public void testClearAllSchedulingData() {
+
 	}
 
 	@SuppressWarnings("deprecation")
