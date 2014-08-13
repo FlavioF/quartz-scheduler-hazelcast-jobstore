@@ -4,7 +4,6 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +29,6 @@ import org.quartz.spi.SchedulerSignaler;
 import org.quartz.spi.TriggerFiredResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.terracotta.quartz.wrappers.JobWrapper;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
@@ -317,32 +315,32 @@ public class HazelcastJobStore implements JobStore {
 		Set<JobKey> outList = null;
 
 		StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
-		String compareToValue = matcher.getCompareToValue();
+		String groupNameCompareValue = matcher.getCompareToValue();
 
 		switch (operator) {
 		case EQUALS:
-
-			if (getJobGroupNames().contains(compareToValue)) {
+			Collection<JobKey> jobKeys = getJobKeyByGroupMap().get(groupNameCompareValue);
+			if (jobKeys != null) {
 				outList = new HashSet<JobKey>();
 
-				for (JobWrapper jw : getjo.values()) {
+				for (JobKey jobKey : jobKeys) {
 
-					if (jw != null) {
-						outList.add(jw.jobDetail.getKey());
+					if (jobKey != null) {
+						outList.add(jobKey);
 					}
 				}
 			}
 			break;
 
 		default:
-			for (Map.Entry<String, HashMap<JobKey, JobWrapper>> entry : jobsByGroup.entrySet()) {
-				if (operator.evaluate(entry.getKey(), compareToValue) && entry.getValue() != null) {
+			for (String groupName : getJobKeyByGroupMap().keySet()) {
+				if (operator.evaluate(groupName, groupNameCompareValue)) {
 					if (outList == null) {
 						outList = new HashSet<JobKey>();
 					}
-					for (JobWrapper jobWrapper : entry.getValue().values()) {
-						if (jobWrapper != null) {
-							outList.add(jobWrapper.jobDetail.getKey());
+					for (JobKey jobKey : getJobKeyByGroupMap().get(groupName)) {
+						if (jobKey != null) {
+							outList.add(jobKey);
 						}
 					}
 				}

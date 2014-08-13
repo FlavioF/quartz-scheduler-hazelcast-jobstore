@@ -5,8 +5,6 @@ import static org.fest.assertions.Assertions.assertThat;
 import java.util.Date;
 import java.util.List;
 
-import lombok.extern.slf4j.Slf4j;
-
 import org.fest.assertions.Assertions;
 import org.quartz.Calendar;
 import org.quartz.DateBuilder;
@@ -24,7 +22,6 @@ import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
 
-@Slf4j
 public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 	@Test
