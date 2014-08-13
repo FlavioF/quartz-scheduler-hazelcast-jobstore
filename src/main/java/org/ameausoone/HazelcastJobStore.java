@@ -49,6 +49,8 @@ public class HazelcastJobStore implements JobStore {
 	private static final String JOB_MAP_KEY = "-JobMap";
 
 	private static final String JOBKEY_BY_GROUP_MAP_KEY = "-JobByGroupMap";
+
+	private static final String TRIGGERKEY_BY_GROUP_MAP_KEY = "-TriggerByGroupMap";
 	/**
 	 * Suffix to identify trigger's map in Hazelcast storage.
 	 */
@@ -134,6 +136,28 @@ public class HazelcastJobStore implements JobStore {
 		return false;
 	}
 
+	/**
+	 * @return Map which contains Jobs.
+	 */
+	private IMap<JobKey, JobDetail> getJobMap() {
+		return hazelcastClient.getMap(instanceName + JOB_MAP_KEY);
+	}
+
+	private MultiMap<String, JobKey> getJobKeyByGroupMap() {
+		return hazelcastClient.getMultiMap(instanceName + JOBKEY_BY_GROUP_MAP_KEY);
+	}
+
+	private MultiMap<String, TriggerKey> getTriggerKeyByGroupMap() {
+		return hazelcastClient.getMultiMap(instanceName + TRIGGERKEY_BY_GROUP_MAP_KEY);
+	}
+
+	/**
+	 * @return Map which contains Jobs.
+	 */
+	private IMap<TriggerKey, Trigger> getTriggerMap() {
+		return hazelcastClient.getMap(instanceName + TRIGGER_MAP_KEY);
+	}
+
 	public void storeJobAndTrigger(JobDetail newJob, OperableTrigger newTrigger) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
 		storeJob(newJob, false);
@@ -152,24 +176,6 @@ public class HazelcastJobStore implements JobStore {
 			jobMap.put(jobKey, newJob);
 			getJobKeyByGroupMap().put(jobKey.getGroup(), jobKey);
 		}
-	}
-
-	/**
-	 * @return Map which contains Jobs.
-	 */
-	private IMap<JobKey, JobDetail> getJobMap() {
-		return hazelcastClient.getMap(instanceName + JOB_MAP_KEY);
-	}
-
-	private MultiMap<String, JobKey> getJobKeyByGroupMap() {
-		return hazelcastClient.getMultiMap(instanceName + JOBKEY_BY_GROUP_MAP_KEY);
-	}
-
-	/**
-	 * @return Map which contains Jobs.
-	 */
-	private IMap<TriggerKey, Trigger> getTriggerMap() {
-		return hazelcastClient.getMap(instanceName + TRIGGER_MAP_KEY);
 	}
 
 	public void storeJobsAndTriggers(Map<JobDetail, Set<? extends Trigger>> triggersAndJobs, boolean replace)
@@ -209,11 +215,13 @@ public class HazelcastJobStore implements JobStore {
 			throw new ObjectAlreadyExistsException(newTrigger);
 		} else {
 			triggerMap.put(triggerKey, newTrigger);
+			getTriggerKeyByGroupMap().put(triggerKey.getGroup(), triggerKey);
 		}
 	}
 
 	public boolean removeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		getTriggerKeyByGroupMap().remove(triggerKey.getGroup(), triggerKey);
 		return triggerMap.remove(triggerKey) != null;
 	}
 
@@ -313,10 +321,8 @@ public class HazelcastJobStore implements JobStore {
 
 	public Set<JobKey> getJobKeys(GroupMatcher<JobKey> matcher) throws JobPersistenceException {
 		Set<JobKey> outList = null;
-
 		StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
 		String groupNameCompareValue = matcher.getCompareToValue();
-
 		switch (operator) {
 		case EQUALS:
 			Collection<JobKey> jobKeys = getJobKeyByGroupMap().get(groupNameCompareValue);
@@ -331,7 +337,6 @@ public class HazelcastJobStore implements JobStore {
 				}
 			}
 			break;
-
 		default:
 			for (String groupName : getJobKeyByGroupMap().keySet()) {
 				if (operator.evaluate(groupName, groupNameCompareValue)) {
@@ -351,8 +356,38 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public Set<TriggerKey> getTriggerKeys(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		Set<TriggerKey> outList = null;
+		StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
+		String groupNameCompareValue = matcher.getCompareToValue();
+		switch (operator) {
+		case EQUALS:
+			Collection<TriggerKey> triggerKeys = getTriggerKeyByGroupMap().get(groupNameCompareValue);
+			if (triggerKeys != null) {
+				outList = newHashSet();
+
+				for (TriggerKey triggerKey : triggerKeys) {
+
+					if (triggerKey != null) {
+						outList.add(triggerKey);
+					}
+				}
+			}
+			break;
+		default:
+			for (String groupName : getTriggerKeyByGroupMap().keySet()) {
+				if (operator.evaluate(groupName, groupNameCompareValue)) {
+					if (outList == null) {
+						outList = newHashSet();
+					}
+					for (TriggerKey triggerKey : getTriggerKeyByGroupMap().get(groupName)) {
+						if (triggerKey != null) {
+							outList.add(triggerKey);
+						}
+					}
+				}
+			}
+		}
+		return outList == null ? java.util.Collections.<TriggerKey> emptySet() : outList;
 	}
 
 	public List<String> getJobGroupNames() throws JobPersistenceException {
