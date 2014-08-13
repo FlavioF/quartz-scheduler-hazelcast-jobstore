@@ -1,7 +1,6 @@
 package org.ameausoone;
 
 import static org.fest.assertions.Assertions.assertThat;
-import static org.quartz.Scheduler.DEFAULT_GROUP;
 
 import java.util.Date;
 import java.util.List;
@@ -15,115 +14,18 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
 import org.quartz.ObjectAlreadyExistsException;
-import org.quartz.SchedulerException;
 import org.quartz.TriggerKey;
 import org.quartz.impl.JobDetailImpl;
 import org.quartz.impl.calendar.BaseCalendar;
 import org.quartz.impl.triggers.SimpleTriggerImpl;
-import org.quartz.simpl.CascadingClassLoadHelper;
-import org.quartz.spi.ClassLoadHelper;
 import org.quartz.spi.OperableTrigger;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
-import com.hazelcast.config.Config;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
 
 @Slf4j
-public class TestHazelcastJobStore {
-
-	private HazelcastInstance hazelcastInstance;
-	private HazelcastJobStore hazelcastJobStore;
-	private SampleSignaler fSignaler;
-	private JobDetailImpl fJobDetail;
-
-	private int buildTriggerIndex = 0;
-
-	@SuppressWarnings("deprecation")
-	@BeforeClass
-	public void setUp() throws SchedulerException, InterruptedException {
-		log.info("SetUp");
-		Config config = new Config();
-		config.setProperty("hazelcast.logging.type", "slf4j");
-		hazelcastInstance = Hazelcast.newHazelcastInstance(config);
-
-		this.fSignaler = new SampleSignaler();
-		hazelcastJobStore = createJobStore("jobstore");
-		ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
-		log.debug("Before loadHelper.initialize()");
-		loadHelper.initialize();
-
-		hazelcastJobStore.initialize(loadHelper, this.fSignaler);
-		hazelcastJobStore.setInstanceId("SimpleInstance");
-		hazelcastJobStore.schedulerStarted();
-
-		this.fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
-		this.hazelcastJobStore.storeJob(this.fJobDetail, false);
-	}
-
-	@AfterMethod
-	public void cleanUpAfterEachTest() throws JobPersistenceException {
-		hazelcastJobStore.clearAllSchedulingData();
-	}
-
-	protected HazelcastJobStore createJobStore(String name) {
-		HazelcastJobStore hazelcastJobStore = new HazelcastJobStore();
-		hazelcastJobStore.setInstanceName(name);
-		return hazelcastJobStore;
-	}
-
-	private JobDetailImpl buildJob(String jobName) {
-		return buildJob(jobName, DEFAULT_GROUP);
-	}
-
-	@SuppressWarnings("deprecation")
-	private JobDetailImpl buildJob(String jobName, String grouName) {
-		JobDetailImpl jobDetailImpl = new JobDetailImpl(jobName, grouName, MyJob.class);
-		return jobDetailImpl;
-	}
-
-	private void storeJob(String jobName) throws ObjectAlreadyExistsException, JobPersistenceException {
-		storeJob(buildJob(jobName));
-	}
-
-	private void storeJob(JobDetailImpl jobDetailImpl) throws ObjectAlreadyExistsException, JobPersistenceException {
-		this.hazelcastJobStore.storeJob(jobDetailImpl, false);
-	}
-
-	private JobDetail retrieveJob(String jobName) throws JobPersistenceException {
-		return this.hazelcastJobStore.retrieveJob(new JobKey(jobName, DEFAULT_GROUP));
-	}
-
-	private OperableTrigger buildTrigger() {
-		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP);
-	}
-
-	@SuppressWarnings("deprecation")
-	private OperableTrigger buildTrigger(String triggerName, String groupName) {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
-
-		OperableTrigger trigger1 = new SimpleTriggerImpl(triggerName, groupName, this.fJobDetail.getName(),
-				this.fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
-		return trigger1;
-	}
-
-	private OperableTrigger retrieveTrigger(OperableTrigger trigger1) throws JobPersistenceException {
-		return hazelcastJobStore.retrieveTrigger(trigger1.getKey());
-	}
-
-	private void storeTrigger(OperableTrigger trigger1) throws ObjectAlreadyExistsException, JobPersistenceException {
-		hazelcastJobStore.storeTrigger(trigger1, false);
-	}
-
-	private void storeCalendar(String calName) throws ObjectAlreadyExistsException, JobPersistenceException {
-		hazelcastJobStore.storeCalendar(calName, new BaseCalendar(), false, false);
-	}
+public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 	@Test
 	public void testStoreSimpleJob() throws ObjectAlreadyExistsException, JobPersistenceException {
@@ -472,9 +374,4 @@ public class TestHazelcastJobStore {
 		// .getTime() + 10000, 1, 1L).get(0));
 	}
 
-	@AfterClass
-	public void cleanUp() {
-		hazelcastJobStore.shutdown();
-		hazelcastInstance.shutdown();
-	}
 }
