@@ -2,12 +2,10 @@ package org.ameausoone;
 
 import static org.fest.assertions.Assertions.assertThat;
 
-import java.util.Date;
 import java.util.List;
 
 import org.fest.assertions.Assertions;
 import org.quartz.Calendar;
-import org.quartz.DateBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
@@ -15,9 +13,7 @@ import org.quartz.ObjectAlreadyExistsException;
 import org.quartz.TriggerKey;
 import org.quartz.impl.JobDetailImpl;
 import org.quartz.impl.calendar.BaseCalendar;
-import org.quartz.impl.triggers.SimpleTriggerImpl;
 import org.quartz.spi.OperableTrigger;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
@@ -83,6 +79,15 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 		this.hazelcastJobStore.storeJob(jobDetailImpl, false);
 		boolean checkExists = hazelcastJobStore.checkExists(jobDetailImpl.getKey());
 		Assertions.assertThat(checkExists).isTrue();
+	}
+
+	@Test(expectedExceptions = { JobPersistenceException.class })
+	public void testStoreTriggerWithoutJob() throws ObjectAlreadyExistsException, JobPersistenceException {
+
+		OperableTrigger trigger1 = buildTrigger();
+		storeTrigger(trigger1);
+		OperableTrigger retrieveTrigger = retrieveTrigger(trigger1);
+		assertThat(retrieveTrigger).isNotNull();
 	}
 
 	@Test
@@ -307,68 +312,6 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 		storeCalendar("cal2");
 		List<String> calendarNames = hazelcastJobStore.getCalendarNames();
 		assertThat(calendarNames).containsOnly("cal1", "cal2");
-	}
-
-	@SuppressWarnings("deprecation")
-	// @Test
-	public void testAcquireNextTrigger() throws JobPersistenceException {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
-
-		// Trigger trigger1 = TriggerBuilder
-		// .newTrigger()
-		// .withIdentity("trigger1", "triggerGroup1")
-		// .startAt(new Date(baseFireTime + 200000))
-		// .withSchedule(
-		// SimpleScheduleBuilder.repeatSecondlyForTotalCount(2, 2))
-		// .endAt(new Date(baseFireTime + 200000)).build();
-		OperableTrigger trigger1 = new SimpleTriggerImpl("trigger1", "triggerGroup1", this.fJobDetail.getName(),
-				this.fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
-		// new SimpleTriggerImpl("trigger1", "triggerGroup1",
-		// this.fJobDetail.getName(), this.fJobDetail.getGroup(),
-		// new Date(baseFireTime + 200000),
-		// new Date(baseFireTime + 200000), 2, 2000);
-		// OperableTrigger trigger2 = new SimpleTriggerImpl("trigger2",
-		// "triggerGroup1", this.fJobDetail.getName(),
-		// this.fJobDetail.getGroup(), new Date(baseFireTime + 50000),
-		// new Date(baseFireTime + 200000), 2, 2000);
-		// OperableTrigger trigger3 = new SimpleTriggerImpl("trigger1",
-		// "triggerGroup2", this.fJobDetail.getName(),
-		// this.fJobDetail.getGroup(), new Date(baseFireTime + 100000),
-		// new Date(baseFireTime + 200000), 2, 2000);
-		// trigger1.computeFirstFireTime(null);
-		// trigger2.computeFirstFireTime(null);
-		// trigger3.computeFirstFireTime(null);
-		this.hazelcastJobStore.storeTrigger(trigger1, false);
-		// this.fJobStore.storeTrigger(trigger2, false);
-		// this.fJobStore.storeTrigger(trigger3, false);
-
-		Date nextFireTime = trigger1.getNextFireTime();
-		Date date = new Date(nextFireTime.getTime());
-		long firstFireTime = date.getTime();
-
-		Assert.assertTrue(this.hazelcastJobStore.acquireNextTriggers(10, 1, 0L).isEmpty());
-		// assertEquals(
-		// trigger2.getKey(),
-		// this.fJobStore
-		// .acquireNextTriggers(firstFireTime + 10000, 1, 0L)
-		// .get(0).getKey());
-		// assertEquals(
-		// trigger3.getKey(),
-		// this.fJobStore
-		// .acquireNextTriggers(firstFireTime + 10000, 1, 0L)
-		// .get(0).getKey());
-		Assert.assertEquals(trigger1.getKey(), this.hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L)
-				.get(0).getKey());
-		Assert.assertTrue(this.hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).isEmpty());
-
-		// release trigger3
-		// this.fJobStore.releaseAcquiredTrigger(trigger3);
-		// assertEquals(
-		// trigger3,
-		// this.fJobStore.acquireNextTriggers(
-		// new Date(trigger1.getNextFireTime().getTime())
-		// .getTime() + 10000, 1, 1L).get(0));
 	}
 
 }

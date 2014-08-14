@@ -1,20 +1,19 @@
 package org.ameausoone;
 
 import static org.quartz.Scheduler.DEFAULT_GROUP;
-
-import java.util.Date;
-
 import lombok.extern.slf4j.Slf4j;
 
-import org.quartz.DateBuilder;
+import org.quartz.JobBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
 import org.quartz.ObjectAlreadyExistsException;
 import org.quartz.SchedulerException;
+import org.quartz.SimpleScheduleBuilder;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
 import org.quartz.impl.JobDetailImpl;
 import org.quartz.impl.calendar.BaseCalendar;
-import org.quartz.impl.triggers.SimpleTriggerImpl;
 import org.quartz.simpl.CascadingClassLoadHelper;
 import org.quartz.spi.ClassLoadHelper;
 import org.quartz.spi.OperableTrigger;
@@ -73,10 +72,9 @@ public abstract class AbstractTestHazelcastJobStore {
 		return buildJob(jobName, DEFAULT_GROUP);
 	}
 
-	@SuppressWarnings("deprecation")
 	protected JobDetailImpl buildJob(String jobName, String grouName) {
-		JobDetailImpl jobDetailImpl = new JobDetailImpl(jobName, grouName, MyJob.class);
-		return jobDetailImpl;
+		JobDetail job = JobBuilder.newJob(MyJob.class).withIdentity(jobName, grouName).build();
+		return (JobDetailImpl) job;
 	}
 
 	protected void storeJob(String jobName) throws ObjectAlreadyExistsException, JobPersistenceException {
@@ -95,14 +93,18 @@ public abstract class AbstractTestHazelcastJobStore {
 		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP);
 	}
 
-	@SuppressWarnings("deprecation")
 	protected OperableTrigger buildTrigger(String triggerName, String groupName) {
-		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-		long baseFireTime = baseFireTimeDate.getTime();
+		SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
+		Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, groupName).withSchedule(schedule)
+				.build();
+		return (OperableTrigger) trigger;
+	}
 
-		OperableTrigger trigger1 = new SimpleTriggerImpl(triggerName, groupName, this.fJobDetail.getName(),
-				this.fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
-		return trigger1;
+	protected OperableTrigger buildTrigger(String triggerName, String groupName, JobDetail jobDetail) {
+		SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
+		Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, groupName).withSchedule(schedule)
+				.forJob(jobDetail).build();
+		return (OperableTrigger) trigger;
 	}
 
 	protected OperableTrigger retrieveTrigger(OperableTrigger trigger1) throws JobPersistenceException {

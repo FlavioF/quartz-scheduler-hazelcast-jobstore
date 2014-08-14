@@ -168,13 +168,17 @@ public class HazelcastJobStore implements JobStore {
 	public void storeJob(JobDetail newJob, boolean replaceExisting) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
-		JobKey jobKey = newJob.getKey();
-		boolean containsKey = jobMap.containsKey(jobKey);
+		JobKey newJobKey = newJob.getKey();
+		boolean containsKey = jobMap.containsKey(newJobKey);
 		if (containsKey && !replaceExisting) {
 			throw new ObjectAlreadyExistsException(newJob);
-		} else {
-			jobMap.put(jobKey, newJob);
-			getJobKeyByGroupMap().put(jobKey.getGroup(), jobKey);
+		}
+		jobMap.lock(newJobKey);
+		try {
+			jobMap.put(newJobKey, newJob);
+			getJobKeyByGroupMap().put(newJobKey.getGroup(), newJobKey);
+		} finally {
+			jobMap.unlock(newJobKey);
 		}
 	}
 
@@ -202,27 +206,52 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public JobDetail retrieveJob(JobKey jobKey) throws JobPersistenceException {
-		IMap<JobKey, JobDetail> iMap = getJobMap();
-		return iMap.get(jobKey);
+		IMap<JobKey, JobDetail> jobMap = getJobMap();
+		if (jobKey == null)
+			return null;
+		if (jobMap.containsKey(jobKey)) {
+			return jobMap.get(jobKey);
+		}
+		return null;
 	}
 
 	public void storeTrigger(OperableTrigger newTrigger, boolean replaceExisting) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
 		TriggerKey triggerKey = newTrigger.getKey();
-		boolean containsKey = triggerMap.containsKey(triggerKey);
-		if (containsKey && !replaceExisting) {
-			throw new ObjectAlreadyExistsException(newTrigger);
-		} else {
+		triggerMap.lock(triggerKey);
+		try {
+			boolean containsKey = triggerMap.containsKey(triggerKey);
+			if (containsKey && !replaceExisting) {
+				throw new ObjectAlreadyExistsException(newTrigger);
+			}
+
+			if (retrieveJob(newTrigger.getJobKey()) == null) {
+				throw new JobPersistenceException("The job (" + newTrigger.getJobKey()
+						+ ") referenced by the trigger does not exist.");
+			}
+
 			triggerMap.put(triggerKey, newTrigger);
 			getTriggerKeyByGroupMap().put(triggerKey.getGroup(), triggerKey);
+		} finally {
+			triggerMap.unlock(triggerKey);
 		}
 	}
 
 	public boolean removeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
+		// TODO implement remove orphanedJob
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
-		getTriggerKeyByGroupMap().remove(triggerKey.getGroup(), triggerKey);
-		return triggerMap.remove(triggerKey) != null;
+		boolean found = triggerMap.containsKey(triggerKey);
+		if (found) {
+			triggerMap.lock(triggerKey);
+			try {
+				getTriggerKeyByGroupMap().remove(triggerKey.getGroup(), triggerKey);
+				triggerMap.remove(triggerKey);
+			} finally {
+				triggerMap.unlock(triggerKey);
+			}
+		}
+		return found;
 	}
 
 	public boolean removeTriggers(List<TriggerKey> triggerKeys) throws JobPersistenceException {
@@ -259,21 +288,20 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void clearAllSchedulingData() throws JobPersistenceException {
-		IMap<JobKey, JobDetail> jobMap = getJobMap();
-		for (JobKey jobKey : jobMap.keySet()) {
-			removeJob(jobKey);
-		}
-
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
 		for (TriggerKey triggerKey : triggerMap.keySet()) {
 			removeTrigger(triggerKey);
+		}
+
+		IMap<JobKey, JobDetail> jobMap = getJobMap();
+		for (JobKey jobKey : jobMap.keySet()) {
+			removeJob(jobKey);
 		}
 
 		IMap<String, Calendar> calendarMap = getCalendarMap();
 		for (String calName : calendarMap.keySet()) {
 			removeCalendar(calName);
 		}
-
 	}
 
 	/**
