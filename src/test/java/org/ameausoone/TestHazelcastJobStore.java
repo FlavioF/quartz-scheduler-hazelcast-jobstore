@@ -83,8 +83,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 	@Test(expectedExceptions = { JobPersistenceException.class })
 	public void testStoreTriggerWithoutJob() throws ObjectAlreadyExistsException, JobPersistenceException {
-
-		OperableTrigger trigger1 = buildTrigger();
+		OperableTrigger trigger1 = buildTrigger("trigger", "group");
 		storeTrigger(trigger1);
 		OperableTrigger retrieveTrigger = retrieveTrigger(trigger1);
 		assertThat(retrieveTrigger).isNotNull();
@@ -92,7 +91,6 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 	@Test
 	public void testStoreTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
-
 		OperableTrigger trigger1 = buildTrigger();
 		storeTrigger(trigger1);
 		OperableTrigger retrieveTrigger = retrieveTrigger(trigger1);
@@ -125,7 +123,8 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 	@Test
 	public void testRemoveTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
-		OperableTrigger trigger1 = buildTrigger();
+		JobDetail storeJob = storeJob(buildJob("job"));
+		OperableTrigger trigger1 = buildTrigger(storeJob);
 		TriggerKey triggerKey = trigger1.getKey();
 		storeTrigger(trigger1);
 		OperableTrigger retrieveTrigger = retrieveTrigger(trigger1);
@@ -239,10 +238,10 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 		assertThat(hazelcastJobStore.getNumberOfCalendars()).isEqualTo(0);
 
 		String jobName = "job40";
-		storeJob(jobName);
+		JobDetail storeJob = storeJob(jobName);
 		assertThat(hazelcastJobStore.getNumberOfJobs()).isEqualTo(1);
 
-		hazelcastJobStore.storeTrigger(buildTrigger(), false);
+		hazelcastJobStore.storeTrigger(buildTrigger("trig", "group", storeJob), false);
 		assertThat(hazelcastJobStore.getNumberOfTriggers()).isEqualTo(1);
 
 		hazelcastJobStore.storeCalendar("calendar", new BaseCalendar(), false, false);
@@ -300,8 +299,9 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 	@Test
 	public void testGetTriggerGroupNames() throws ObjectAlreadyExistsException, JobPersistenceException {
-		storeTrigger(buildTrigger("trigger1", "group1"));
-		storeTrigger(buildTrigger("trigger2", "group2"));
+		JobDetail storeJob = storeJob(buildJob("job"));
+		storeTrigger(buildTrigger("trigger1", "group1", storeJob));
+		storeTrigger(buildTrigger("trigger2", "group2", storeJob));
 		List<String> triggerGroupNames = hazelcastJobStore.getTriggerGroupNames();
 		assertThat(triggerGroupNames).containsOnly("group1", "group2");
 	}

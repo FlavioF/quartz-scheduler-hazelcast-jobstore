@@ -32,6 +32,8 @@ public abstract class AbstractTestHazelcastJobStore {
 	protected HazelcastJobStore hazelcastJobStore;
 	protected SampleSignaler fSignaler;
 	protected JobDetailImpl fJobDetail;
+	protected int buildTriggerIndex = 0;
+	protected int buildJobIndex = 0;
 
 	@SuppressWarnings("deprecation")
 	@BeforeClass
@@ -55,8 +57,6 @@ public abstract class AbstractTestHazelcastJobStore {
 		this.hazelcastJobStore.storeJob(this.fJobDetail, false);
 	}
 
-	protected int buildTriggerIndex = 0;
-
 	@AfterMethod
 	public void cleanUpAfterEachTest() throws JobPersistenceException {
 		hazelcastJobStore.clearAllSchedulingData();
@@ -68,6 +68,10 @@ public abstract class AbstractTestHazelcastJobStore {
 		return hazelcastJobStore;
 	}
 
+	protected JobDetailImpl buildJob() {
+		return buildJob("jobName" + buildJobIndex++, DEFAULT_GROUP);
+	}
+
 	protected JobDetailImpl buildJob(String jobName) {
 		return buildJob(jobName, DEFAULT_GROUP);
 	}
@@ -77,20 +81,32 @@ public abstract class AbstractTestHazelcastJobStore {
 		return (JobDetailImpl) job;
 	}
 
-	protected void storeJob(String jobName) throws ObjectAlreadyExistsException, JobPersistenceException {
-		storeJob(buildJob(jobName));
+	protected JobDetail storeJob(String jobName) throws ObjectAlreadyExistsException, JobPersistenceException {
+		return storeJob(buildJob(jobName));
 	}
 
-	protected void storeJob(JobDetailImpl jobDetailImpl) throws ObjectAlreadyExistsException, JobPersistenceException {
+	protected JobDetail storeJob(JobDetailImpl jobDetailImpl) throws ObjectAlreadyExistsException,
+			JobPersistenceException {
 		this.hazelcastJobStore.storeJob(jobDetailImpl, false);
+		return (JobDetail) jobDetailImpl;
+	}
+
+	protected JobDetail buildAndStoreJob() throws ObjectAlreadyExistsException, JobPersistenceException {
+		JobDetailImpl buildJob = buildJob();
+		this.hazelcastJobStore.storeJob(buildJob, false);
+		return (JobDetail) buildJob;
 	}
 
 	protected JobDetail retrieveJob(String jobName) throws JobPersistenceException {
 		return this.hazelcastJobStore.retrieveJob(new JobKey(jobName, DEFAULT_GROUP));
 	}
 
-	protected OperableTrigger buildTrigger() {
-		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP);
+	protected OperableTrigger buildTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
+		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, buildAndStoreJob());
+	}
+
+	protected OperableTrigger buildTrigger(JobDetail jobDetail) {
+		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, jobDetail);
 	}
 
 	protected OperableTrigger buildTrigger(String triggerName, String groupName) {
@@ -104,6 +120,7 @@ public abstract class AbstractTestHazelcastJobStore {
 		SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
 		Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, groupName).withSchedule(schedule)
 				.forJob(jobDetail).build();
+
 		return (OperableTrigger) trigger;
 	}
 
