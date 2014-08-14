@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.quartz.Calendar;
@@ -184,7 +185,25 @@ public class HazelcastJobStore implements JobStore {
 
 	public void storeJobsAndTriggers(Map<JobDetail, Set<? extends Trigger>> triggersAndJobs, boolean replace)
 			throws ObjectAlreadyExistsException, JobPersistenceException {
-		// TODO Auto-generated method stub
+
+		if (!replace) {
+			for (Entry<JobDetail, Set<? extends Trigger>> e : triggersAndJobs.entrySet()) {
+				JobDetail jobDetail = e.getKey();
+				if (checkExists(jobDetail.getKey()))
+					throw new ObjectAlreadyExistsException(jobDetail);
+				for (Trigger trigger : e.getValue()) {
+					if (checkExists(trigger.getKey()))
+						throw new ObjectAlreadyExistsException(trigger);
+				}
+			}
+		}
+		// do bulk add...
+		for (Entry<JobDetail, Set<? extends Trigger>> e : triggersAndJobs.entrySet()) {
+			storeJob(e.getKey(), true);
+			for (Trigger trigger : e.getValue()) {
+				storeTrigger((OperableTrigger) trigger, true);
+			}
+		}
 
 	}
 

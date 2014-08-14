@@ -12,7 +12,7 @@ import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
-import org.quartz.impl.JobDetailImpl;
+import org.quartz.TriggerKey;
 import org.quartz.impl.calendar.BaseCalendar;
 import org.quartz.simpl.CascadingClassLoadHelper;
 import org.quartz.spi.ClassLoadHelper;
@@ -31,11 +31,10 @@ public abstract class AbstractTestHazelcastJobStore {
 	private HazelcastInstance hazelcastInstance;
 	protected HazelcastJobStore hazelcastJobStore;
 	protected SampleSignaler fSignaler;
-	protected JobDetailImpl fJobDetail;
+	// protected JobDetailImpl fJobDetail;
 	protected int buildTriggerIndex = 0;
 	protected int buildJobIndex = 0;
 
-	@SuppressWarnings("deprecation")
 	@BeforeClass
 	public void setUp() throws SchedulerException, InterruptedException {
 		log.info("SetUp");
@@ -53,8 +52,8 @@ public abstract class AbstractTestHazelcastJobStore {
 		hazelcastJobStore.setInstanceId("SimpleInstance");
 		hazelcastJobStore.schedulerStarted();
 
-		this.fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
-		this.hazelcastJobStore.storeJob(this.fJobDetail, false);
+		// this.fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
+		// this.hazelcastJobStore.storeJob(this.fJobDetail, false);
 	}
 
 	@AfterMethod
@@ -68,31 +67,30 @@ public abstract class AbstractTestHazelcastJobStore {
 		return hazelcastJobStore;
 	}
 
-	protected JobDetailImpl buildJob() {
+	protected JobDetail buildJob() {
 		return buildJob("jobName" + buildJobIndex++, DEFAULT_GROUP);
 	}
 
-	protected JobDetailImpl buildJob(String jobName) {
+	protected JobDetail buildJob(String jobName) {
 		return buildJob(jobName, DEFAULT_GROUP);
 	}
 
-	protected JobDetailImpl buildJob(String jobName, String grouName) {
+	protected JobDetail buildJob(String jobName, String grouName) {
 		JobDetail job = JobBuilder.newJob(MyJob.class).withIdentity(jobName, grouName).build();
-		return (JobDetailImpl) job;
+		return job;
 	}
 
 	protected JobDetail storeJob(String jobName) throws ObjectAlreadyExistsException, JobPersistenceException {
 		return storeJob(buildJob(jobName));
 	}
 
-	protected JobDetail storeJob(JobDetailImpl jobDetailImpl) throws ObjectAlreadyExistsException,
-			JobPersistenceException {
-		this.hazelcastJobStore.storeJob(jobDetailImpl, false);
-		return (JobDetail) jobDetailImpl;
+	protected JobDetail storeJob(JobDetail jobDetail) throws ObjectAlreadyExistsException, JobPersistenceException {
+		this.hazelcastJobStore.storeJob(jobDetail, false);
+		return (JobDetail) jobDetail;
 	}
 
 	protected JobDetail buildAndStoreJob() throws ObjectAlreadyExistsException, JobPersistenceException {
-		JobDetailImpl buildJob = buildJob();
+		JobDetail buildJob = buildJob();
 		this.hazelcastJobStore.storeJob(buildJob, false);
 		return (JobDetail) buildJob;
 	}
@@ -101,35 +99,35 @@ public abstract class AbstractTestHazelcastJobStore {
 		return this.hazelcastJobStore.retrieveJob(new JobKey(jobName, DEFAULT_GROUP));
 	}
 
-	protected OperableTrigger buildTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
+	protected Trigger buildTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
 		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, buildAndStoreJob());
 	}
 
-	protected OperableTrigger buildTrigger(JobDetail jobDetail) {
+	protected Trigger buildTrigger(JobDetail jobDetail) {
 		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, jobDetail);
 	}
 
-	protected OperableTrigger buildTrigger(String triggerName, String groupName) {
+	protected Trigger buildTrigger(String triggerName, String groupName) {
 		SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
 		Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, groupName).withSchedule(schedule)
 				.build();
-		return (OperableTrigger) trigger;
+		return (Trigger) trigger;
 	}
 
-	protected OperableTrigger buildTrigger(String triggerName, String groupName, JobDetail jobDetail) {
+	protected Trigger buildTrigger(String triggerName, String groupName, JobDetail jobDetail) {
 		SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
 		Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, groupName).withSchedule(schedule)
 				.forJob(jobDetail).build();
 
-		return (OperableTrigger) trigger;
+		return trigger;
 	}
 
-	protected OperableTrigger retrieveTrigger(OperableTrigger trigger1) throws JobPersistenceException {
-		return hazelcastJobStore.retrieveTrigger(trigger1.getKey());
+	protected Trigger retrieveTrigger(TriggerKey triggerKey) throws JobPersistenceException {
+		return hazelcastJobStore.retrieveTrigger(triggerKey);
 	}
 
-	protected void storeTrigger(OperableTrigger trigger1) throws ObjectAlreadyExistsException, JobPersistenceException {
-		hazelcastJobStore.storeTrigger(trigger1, false);
+	protected void storeTrigger(Trigger trigger1) throws ObjectAlreadyExistsException, JobPersistenceException {
+		hazelcastJobStore.storeTrigger((OperableTrigger) trigger1, false);
 	}
 
 	protected void storeCalendar(String calName) throws ObjectAlreadyExistsException, JobPersistenceException {
