@@ -4,6 +4,7 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.quartz.spi.TriggerFiredResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Lists;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.config.ClientNetworkConfig;
@@ -129,7 +131,8 @@ public class HazelcastJobStore implements JobStore {
 
 	public long getEstimatedTimeToReleaseAndAcquireTrigger() {
 		// TODO Auto-generated method stub
-		return 0;
+		// C/C from RAMJobStore
+		return 5;
 	}
 
 	public boolean isClustered() {
@@ -209,8 +212,17 @@ public class HazelcastJobStore implements JobStore {
 
 	public boolean removeJob(JobKey jobKey) throws JobPersistenceException {
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
-		getJobKeyByGroupMap().remove(jobKey.getGroup(), jobKey);
-		return jobMap.remove(jobKey) != null;
+		boolean found = jobMap.containsKey(jobKey);
+		if (found) {
+			List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
+			for (OperableTrigger trigger : triggersForJob) {
+				removeTrigger(trigger.getKey());
+			}
+			getJobKeyByGroupMap().remove(jobKey.getGroup(), jobKey);
+			return jobMap.remove(jobKey) != null;
+		}
+		return false;
+
 	}
 
 	public boolean removeJobs(List<JobKey> jobKeys) throws JobPersistenceException {
@@ -454,12 +466,36 @@ public class HazelcastJobStore implements JobStore {
 		return newArrayList(getCalendarMap().keySet());
 	}
 
-	public List<OperableTrigger> getTriggersForJob(JobKey jobKey) throws JobPersistenceException {
+	public List<OperableTrigger> getTriggersForJob(final JobKey jobKey) throws JobPersistenceException {
+		// TODO IMap.values(Predicate predicate) is certainly more efficient, but didn't find how to fix : Caused by:
+		// java.io.NotSerializableException: org.ameausoone.HazelcastJobStore.
+		if (jobKey == null)
+			return Collections.emptyList();
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		Collection<Trigger> values = triggerMap.values();
+		List<OperableTrigger> outList = Lists.newArrayList();
+		for (Trigger trigger : values) {
+			if (jobKey.equals(trigger.getJobKey()))
+				outList.add((OperableTrigger) trigger);
+		}
+		return outList;
+	}
+
+	public void pauseJob(JobKey jobKey) throws JobPersistenceException {
+		// TODO Auto-generated method stub
+	}
+
+	public void resumeJob(JobKey jobKey) throws JobPersistenceException {
+		// TODO Auto-generated method stub
+	
+	}
+
+	public Collection<String> pauseJobs(GroupMatcher<JobKey> groupMatcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
+	public Collection<String> resumeJobs(GroupMatcher<JobKey> matcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -470,16 +506,6 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public Collection<String> pauseTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public void pauseJob(JobKey jobKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-
-	}
-
-	public Collection<String> pauseJobs(GroupMatcher<JobKey> groupMatcher) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -499,12 +525,7 @@ public class HazelcastJobStore implements JobStore {
 		return null;
 	}
 
-	public void resumeJob(JobKey jobKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-
-	}
-
-	public Collection<String> resumeJobs(GroupMatcher<JobKey> matcher) throws JobPersistenceException {
+	public TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}

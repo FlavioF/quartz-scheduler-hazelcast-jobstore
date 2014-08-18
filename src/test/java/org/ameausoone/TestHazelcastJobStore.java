@@ -46,10 +46,18 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 		storeJob(jobDetail);
 		JobDetail retrieveJob = retrieveJob(jobName);
 		assertThat(retrieveJob).isNotNull();
+		Trigger trigger = buildTrigger(jobDetail);
+		storeTrigger(trigger);
+
+		assertThat(retrieveTrigger(trigger.getKey())).isNotNull();
+
 		boolean removeJob = this.hazelcastJobStore.removeJob(jobDetail.getKey());
 		assertThat(removeJob).isTrue();
 		retrieveJob = retrieveJob(jobName);
 		assertThat(retrieveJob).isNull();
+
+		assertThat(retrieveTrigger(trigger.getKey())).isNull();
+
 		removeJob = this.hazelcastJobStore.removeJob(jobDetail.getKey());
 		assertThat(removeJob).isFalse();
 	}
@@ -354,6 +362,17 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 		set1.add(trigger1);
 		triggersAndJobs.put(job1, set1);
 		hazelcastJobStore.storeJobsAndTriggers(triggersAndJobs, false);
+	}
 
+	@Test
+	public void testGetTriggersForJob() throws JobPersistenceException {
+		JobDetail jobDetail = buildAndStoreJob();
+		Trigger trigger1 = buildTrigger(jobDetail);
+		Trigger trigger2 = buildTrigger(jobDetail);
+		storeTrigger(trigger1);
+		storeTrigger(trigger2);
+
+		List<OperableTrigger> triggersForJob = hazelcastJobStore.getTriggersForJob(jobDetail.getKey());
+		assertThat(triggersForJob).containsOnly(trigger1, trigger2);
 	}
 }

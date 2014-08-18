@@ -42,7 +42,7 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 	@Test
 	public void testJobGroupMatcher() throws Exception {
 		// Store jobs.
-		for (int i = 0; i < 14; i++) {
+		for (int i = 0; i < 15; i++) {
 			String group = i < 5 ? "a" : "ab";
 			if (i >= 10) {
 				group = "c";
