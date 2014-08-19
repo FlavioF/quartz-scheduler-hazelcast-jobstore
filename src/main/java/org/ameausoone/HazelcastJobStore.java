@@ -2,10 +2,12 @@ package org.ameausoone;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
+import static org.quartz.Trigger.TriggerState.PAUSED;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -38,6 +40,7 @@ import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.config.ClientNetworkConfig;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
+import com.hazelcast.core.ISet;
 import com.hazelcast.core.MultiMap;
 
 /**
@@ -53,13 +56,21 @@ public class HazelcastJobStore implements JobStore {
 
 	private static final String JOBKEY_BY_GROUP_MAP_KEY = "-JobByGroupMap";
 
-	private static final String TRIGGERKEY_BY_GROUP_MAP_KEY = "-TriggerByGroupMap";
 	/**
 	 * Suffix to identify trigger's map in Hazelcast storage.
 	 */
 	private static final String TRIGGER_MAP_KEY = "-TriggerMap";
 
+	private static final String TRIGGERKEY_BY_GROUP_MAP_KEY = "-TriggerByGroupMap";
+
+	/**
+	 * Suffix to identify trigger state's map in Hazelcast storage.
+	 */
+	private static final String TRIGGER_STATE_MAP_KEY = "-TriggerStateMap";
+
 	private static final String CALENDAR_MAP_KEY = "-CalendarMap";
+
+	private static final String PAUSED_TRIGGER_SET_KEY = "-PausedTriggerSet";
 
 	private final Logger logger = LoggerFactory.getLogger(HazelcastJobStore.class);
 
@@ -81,7 +92,6 @@ public class HazelcastJobStore implements JobStore {
 		this.classLoadHelper = loadHelper;
 		System.setProperty("hazelcast.logging.type", "slf4j");
 		ClientConfig clientConfig = new ClientConfig();
-		// clientConfig.addAddress("127.0.0.1:5701");
 		ClientNetworkConfig networkConfig = clientConfig.getNetworkConfig();
 		networkConfig.addAddress("127.0.0.1:5701");
 
@@ -103,7 +113,6 @@ public class HazelcastJobStore implements JobStore {
 	 * @param misfireThreshold
 	 *            the new misfire threshold
 	 */
-	@SuppressWarnings("UnusedDeclaration")
 	public void setMisfireThreshold(long misfireThreshold) {
 		if (misfireThreshold < 1) {
 			throw new IllegalArgumentException("Misfire threshold must be larger than 0");
@@ -147,19 +156,36 @@ public class HazelcastJobStore implements JobStore {
 		return hazelcastClient.getMap(instanceName + JOB_MAP_KEY);
 	}
 
+	/**
+	 * JobKeys by group name
+	 */
 	private MultiMap<String, JobKey> getJobKeyByGroupMap() {
 		return hazelcastClient.getMultiMap(instanceName + JOBKEY_BY_GROUP_MAP_KEY);
 	}
 
+	/**
+	 * @return Map which contains Trigger by TriggerKey.
+	 */
+	private IMap<TriggerKey, Trigger> getTriggerMap() {
+		return hazelcastClient.getMap(instanceName + TRIGGER_MAP_KEY);
+	}
+
+	/**
+	 * TriggerKeys by Trigger group name
+	 */
 	private MultiMap<String, TriggerKey> getTriggerKeyByGroupMap() {
 		return hazelcastClient.getMultiMap(instanceName + TRIGGERKEY_BY_GROUP_MAP_KEY);
 	}
 
 	/**
-	 * @return Map which contains Jobs.
+	 * @return Map which contains Trigger by TriggerKey.
 	 */
-	private IMap<TriggerKey, Trigger> getTriggerMap() {
-		return hazelcastClient.getMap(instanceName + TRIGGER_MAP_KEY);
+	private IMap<TriggerKey, TriggerState> getTriggerStateMap() {
+		return hazelcastClient.getMap(instanceName + TRIGGER_STATE_MAP_KEY);
+	}
+
+	private ISet<String> getHZPausedTriggerGroups() {
+		return hazelcastClient.getSet(instanceName + PAUSED_TRIGGER_SET_KEY);
 	}
 
 	public void storeJobAndTrigger(JobDetail newJob, OperableTrigger newTrigger) throws ObjectAlreadyExistsException,
@@ -249,8 +275,10 @@ public class HazelcastJobStore implements JobStore {
 	public void storeTrigger(OperableTrigger newTrigger, boolean replaceExisting) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
 		TriggerKey triggerKey = newTrigger.getKey();
 		triggerMap.lock(triggerKey);
+		triggerStateMap.lock(triggerKey);
 		try {
 			boolean containsKey = triggerMap.containsKey(triggerKey);
 			if (containsKey && !replaceExisting) {
@@ -261,25 +289,31 @@ public class HazelcastJobStore implements JobStore {
 				throw new JobPersistenceException("The job (" + newTrigger.getJobKey()
 						+ ") referenced by the trigger does not exist.");
 			}
-
 			triggerMap.put(triggerKey, newTrigger);
+			triggerStateMap.put(triggerKey, TriggerState.NORMAL);
+
 			getTriggerKeyByGroupMap().put(triggerKey.getGroup(), triggerKey);
 		} finally {
 			triggerMap.unlock(triggerKey);
+			triggerStateMap.unlock(triggerKey);
 		}
 	}
 
 	public boolean removeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO implement remove orphanedJob
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
 		boolean found = triggerMap.containsKey(triggerKey);
 		if (found) {
 			triggerMap.lock(triggerKey);
+			triggerStateMap.lock(triggerKey);
 			try {
 				getTriggerKeyByGroupMap().remove(triggerKey.getGroup(), triggerKey);
 				triggerMap.remove(triggerKey);
+				triggerStateMap.remove(triggerKey);
 			} finally {
 				triggerMap.unlock(triggerKey);
+				triggerStateMap.unlock(triggerKey);
 			}
 		}
 		return found;
@@ -467,8 +501,8 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public List<OperableTrigger> getTriggersForJob(final JobKey jobKey) throws JobPersistenceException {
-		// TODO IMap.values(Predicate predicate) is certainly more efficient, but didn't find how to fix : Caused by:
-		// java.io.NotSerializableException: org.ameausoone.HazelcastJobStore.
+		// TODO IMap.values(Predicate predicate) is certainly more efficient, but didn't find how to fix : "Caused by:
+		// java.io.NotSerializableException: org.ameausoone.HazelcastJobStore."
 		if (jobKey == null)
 			return Collections.emptyList();
 		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
@@ -481,13 +515,84 @@ public class HazelcastJobStore implements JobStore {
 		return outList;
 	}
 
+	public void pauseTrigger(TriggerKey triggerKey) throws JobPersistenceException {
+		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
+		triggerStateMap.lock(triggerKey);
+		try {
+			triggerStateMap.put(triggerKey, PAUSED);
+		} finally {
+			triggerStateMap.unlock(triggerKey);
+		}
+	}
+
+	public TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
+		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
+		triggerStateMap.lock(triggerKey);
+		try {
+			return triggerStateMap.get(triggerKey);
+		} finally {
+			triggerStateMap.unlock(triggerKey);
+		}
+	}
+
+	public void resumeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
+		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
+		triggerStateMap.lock(triggerKey);
+		try {
+			triggerStateMap.put(triggerKey, TriggerState.NORMAL);
+		} finally {
+			triggerStateMap.unlock(triggerKey);
+		}
+	}
+
+	public Collection<String> pauseTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
+		Set<TriggerKey> triggerKeys = getTriggerKeys(matcher);
+
+		List<String> pausedGroups = new LinkedList<String>();
+
+		StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
+		switch (operator) {
+		case EQUALS:
+			if (getHZPausedTriggerGroups().add(matcher.getCompareToValue())) {
+				pausedGroups.add(matcher.getCompareToValue());
+			}
+			break;
+		default:
+			for (String group : getTriggerKeyByGroupMap().keySet()) {
+				if (operator.evaluate(group, matcher.getCompareToValue())) {
+					if (getHZPausedTriggerGroups().add(matcher.getCompareToValue())) {
+						pausedGroups.add(group);
+					}
+				}
+			}
+		}
+
+		for (String pausedGroup : pausedGroups) {
+			Set<TriggerKey> keys = getTriggerKeys(GroupMatcher.triggerGroupEquals(pausedGroup));
+
+			for (TriggerKey key : keys) {
+				pauseTrigger(key);
+			}
+		}
+
+		for (TriggerKey triggerKey : triggerKeys) {
+			pauseTrigger(triggerKey);
+		}
+		return null;
+	}
+
+	public Collection<String> resumeTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 	public void pauseJob(JobKey jobKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 	}
 
 	public void resumeJob(JobKey jobKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
-	
+
 	}
 
 	public Collection<String> pauseJobs(GroupMatcher<JobKey> groupMatcher) throws JobPersistenceException {
@@ -500,32 +605,7 @@ public class HazelcastJobStore implements JobStore {
 		return null;
 	}
 
-	public void pauseTrigger(TriggerKey triggerKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-
-	}
-
-	public Collection<String> pauseTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public void resumeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-
-	}
-
-	public Collection<String> resumeTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
 	public Set<String> getPausedTriggerGroups() throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO Auto-generated method stub
 		return null;
 	}

@@ -126,8 +126,8 @@ public abstract class AbstractTestHazelcastJobStore {
 		return hazelcastJobStore.retrieveTrigger(triggerKey);
 	}
 
-	protected void storeTrigger(Trigger trigger1) throws ObjectAlreadyExistsException, JobPersistenceException {
-		hazelcastJobStore.storeTrigger((OperableTrigger) trigger1, false);
+	protected void storeTrigger(Trigger trigger) throws ObjectAlreadyExistsException, JobPersistenceException {
+		hazelcastJobStore.storeTrigger((OperableTrigger) trigger, false);
 	}
 
 	protected void storeCalendar(String calName) throws ObjectAlreadyExistsException, JobPersistenceException {
