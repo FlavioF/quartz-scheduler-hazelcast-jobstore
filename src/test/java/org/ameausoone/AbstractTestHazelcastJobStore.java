@@ -99,6 +99,9 @@ public abstract class AbstractTestHazelcastJobStore {
 		return this.hazelcastJobStore.retrieveJob(new JobKey(jobName, DEFAULT_GROUP));
 	}
 
+	/**
+	 * @return Trigger with default (and incremented) name and default group, and attached to a (already stored) job.
+	 */
 	protected Trigger buildTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
 		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, buildAndStoreJob());
 	}
@@ -107,6 +110,15 @@ public abstract class AbstractTestHazelcastJobStore {
 		return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, jobDetail);
 	}
 
+	protected Trigger buildAndStoreTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
+		Trigger trigger = buildTrigger();
+		storeTrigger(trigger);
+		return trigger;
+	}
+
+	/**
+	 * @return build Trigger with specified name and group, unattached to a job.
+	 */
 	protected Trigger buildTrigger(String triggerName, String groupName) {
 		SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
 		Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, groupName).withSchedule(schedule)

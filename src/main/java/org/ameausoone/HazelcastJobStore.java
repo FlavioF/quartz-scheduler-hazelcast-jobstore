@@ -2,8 +2,10 @@ package org.ameausoone;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
+import static org.quartz.Trigger.TriggerState.NORMAL;
 import static org.quartz.Trigger.TriggerState.PAUSED;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -281,16 +283,17 @@ public class HazelcastJobStore implements JobStore {
 		triggerStateMap.lock(triggerKey);
 		try {
 			boolean containsKey = triggerMap.containsKey(triggerKey);
-			if (containsKey && !replaceExisting) {
+			if (containsKey && !replaceExisting)
 				throw new ObjectAlreadyExistsException(newTrigger);
-			}
 
-			if (retrieveJob(newTrigger.getJobKey()) == null) {
+			if (retrieveJob(newTrigger.getJobKey()) == null)
 				throw new JobPersistenceException("The job (" + newTrigger.getJobKey()
 						+ ") referenced by the trigger does not exist.");
-			}
+
 			triggerMap.put(triggerKey, newTrigger);
-			triggerStateMap.put(triggerKey, TriggerState.NORMAL);
+
+			TriggerState state = getHZPausedTriggerGroups().contains(triggerKey.getGroup()) ? PAUSED : NORMAL;
+			triggerStateMap.put(triggerKey, state);
 
 			getTriggerKeyByGroupMap().put(triggerKey.getGroup(), triggerKey);
 		} finally {
@@ -353,9 +356,13 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void clearAllSchedulingData() throws JobPersistenceException {
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
-		for (TriggerKey triggerKey : triggerMap.keySet()) {
+		for (TriggerKey triggerKey : getTriggerMap().keySet()) {
 			removeTrigger(triggerKey);
+		}
+
+		ISet<String> hzPausedTriggerGroups = getHZPausedTriggerGroups();
+		for (String group : hzPausedTriggerGroups) {
+			hzPausedTriggerGroups.remove(group);
 		}
 
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
@@ -546,8 +553,6 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public Collection<String> pauseTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
-		Set<TriggerKey> triggerKeys = getTriggerKeys(matcher);
-
 		List<String> pausedGroups = new LinkedList<String>();
 
 		StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
@@ -569,21 +574,34 @@ public class HazelcastJobStore implements JobStore {
 
 		for (String pausedGroup : pausedGroups) {
 			Set<TriggerKey> keys = getTriggerKeys(GroupMatcher.triggerGroupEquals(pausedGroup));
-
 			for (TriggerKey key : keys) {
 				pauseTrigger(key);
 			}
 		}
-
-		for (TriggerKey triggerKey : triggerKeys) {
-			pauseTrigger(triggerKey);
-		}
-		return null;
+		return pausedGroups;
 	}
 
 	public Collection<String> resumeTriggers(GroupMatcher<TriggerKey> matcher) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		Set<String> resumeGroups = new HashSet<String>();
+
+		Set<TriggerKey> keys = getTriggerKeys(matcher);
+		ISet<String> pausedTriggerGroups = getHZPausedTriggerGroups();
+
+		for (TriggerKey triggerKey : keys) {
+			resumeGroups.add(triggerKey.getGroup());
+			// TODO implement pausedJobGroups (in the next episode... )
+			// if (triggersByKey.get(triggerKey) != null) {
+			// String jobGroup = triggersByKey.get(triggerKey).getJobKey().getGroup();
+			// if (pausedJobGroups.contains(jobGroup)) {
+			// continue;
+			// }
+			// }
+			resumeTrigger(triggerKey);
+		}
+		for (String group : resumeGroups) {
+			pausedTriggerGroups.remove(group);
+		}
+		return new ArrayList<String>(resumeGroups);
 	}
 
 	public void pauseJob(JobKey jobKey) throws JobPersistenceException {
