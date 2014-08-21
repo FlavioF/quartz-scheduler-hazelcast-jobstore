@@ -95,6 +95,14 @@ public abstract class AbstractTestHazelcastJobStore {
 		return (JobDetail) buildJob;
 	}
 
+	protected JobDetail buildAndStoreJobWithTrigger() throws ObjectAlreadyExistsException, JobPersistenceException {
+		JobDetail buildJob = buildJob();
+		this.hazelcastJobStore.storeJob(buildJob, false);
+		Trigger trigger = buildTrigger(buildJob);
+		storeTrigger(trigger);
+		return (JobDetail) buildJob;
+	}
+
 	protected JobDetail retrieveJob(String jobName) throws JobPersistenceException {
 		return this.hazelcastJobStore.retrieveJob(new JobKey(jobName, DEFAULT_GROUP));
 	}

@@ -51,6 +51,8 @@ import com.hazelcast.core.MultiMap;
  */
 public class HazelcastJobStore implements JobStore {
 
+	private final Logger log = LoggerFactory.getLogger(HazelcastJobStore.class);
+
 	/**
 	 * Suffix to identify job's map in Hazelcast storage.
 	 */
@@ -72,9 +74,9 @@ public class HazelcastJobStore implements JobStore {
 
 	private static final String CALENDAR_MAP_KEY = "-CalendarMap";
 
-	private static final String PAUSED_TRIGGER_SET_KEY = "-PausedTriggerSet";
+	private static final String PAUSED_TRIGGER_GROUP_SET_KEY = "-PausedTriggerGroupSet";
 
-	private final Logger logger = LoggerFactory.getLogger(HazelcastJobStore.class);
+	private static final String PAUSED_JOB_GROUP_SET_KEY = "-PausedJobGroupSet";
 
 	private String instanceName;
 
@@ -101,7 +103,7 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void schedulerStarted() throws SchedulerException {
-		logger.info("Start HazelcastJobStore [" + instanceName + "]");
+		log.info("Start HazelcastJobStore [" + instanceName + "]");
 	}
 
 	public long getMisfireThreshold() {
@@ -159,7 +161,7 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	/**
-	 * JobKeys by group name
+	 * JobKeys by group name return a Multimap which map a groupName to a List of JobKeys
 	 */
 	private MultiMap<String, JobKey> getJobKeyByGroupMap() {
 		return hazelcastClient.getMultiMap(instanceName + JOBKEY_BY_GROUP_MAP_KEY);
@@ -187,7 +189,11 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	private ISet<String> getHZPausedTriggerGroups() {
-		return hazelcastClient.getSet(instanceName + PAUSED_TRIGGER_SET_KEY);
+		return hazelcastClient.getSet(instanceName + PAUSED_TRIGGER_GROUP_SET_KEY);
+	}
+
+	private ISet<String> getPausedJobGroups() {
+		return hazelcastClient.getSet(instanceName + PAUSED_JOB_GROUP_SET_KEY);
 	}
 
 	public void storeJobAndTrigger(JobDetail newJob, OperableTrigger newTrigger) throws ObjectAlreadyExistsException,
@@ -605,17 +611,65 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void pauseJob(JobKey jobKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
+		IMap<JobKey, JobDetail> jobMap = getJobMap();
+		boolean found = jobMap.containsKey(jobKey);
+		if (!found)
+			return;
+		jobMap.lock(jobKey);
+		try {
+			List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
+			for (OperableTrigger trigger : triggersForJob) {
+				pauseTrigger(trigger.getKey());
+			}
+		} finally {
+			jobMap.unlock(jobKey);
+		}
 	}
 
 	public void resumeJob(JobKey jobKey) throws JobPersistenceException {
-		// TODO Auto-generated method stub
+		IMap<JobKey, JobDetail> jobMap = getJobMap();
+		boolean found = jobMap.containsKey(jobKey);
+		if (!found)
+			return;
+		jobMap.lock(jobKey);
+		try {
+			List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
+			for (OperableTrigger trigger : triggersForJob) {
+				resumeTrigger(trigger.getKey());
+			}
+		} finally {
+			jobMap.unlock(jobKey);
+		}
 
 	}
 
 	public Collection<String> pauseJobs(GroupMatcher<JobKey> groupMatcher) throws JobPersistenceException {
-		// TODO Auto-generated method stub
-		return null;
+		List<String> pausedGroups = new LinkedList<String>();
+		ISet<String> pausedJobGroups = getPausedJobGroups();
+		StringMatcher.StringOperatorName operator = groupMatcher.getCompareWithOperator();
+		MultiMap<String, JobKey> jobKeyByGroupMap = getJobKeyByGroupMap();
+		switch (operator) {
+		case EQUALS:
+			if (pausedJobGroups.add(groupMatcher.getCompareToValue())) {
+				pausedGroups.add(groupMatcher.getCompareToValue());
+			}
+			break;
+		default:
+			for (String jobGroup : jobKeyByGroupMap.keySet()) {
+				if (operator.evaluate(jobGroup, groupMatcher.getCompareToValue())) {
+					if (pausedJobGroups.add(jobGroup)) {
+						pausedGroups.add(jobGroup);
+					}
+				}
+			}
+		}
+
+		for (String groupName : pausedGroups) {
+			for (JobKey jobKey : getJobKeys(GroupMatcher.jobGroupEquals(groupName))) {
+				pauseJob(jobKey);
+			}
+		}
+		return pausedGroups;
 	}
 
 	public Collection<String> resumeJobs(GroupMatcher<JobKey> matcher) throws JobPersistenceException {

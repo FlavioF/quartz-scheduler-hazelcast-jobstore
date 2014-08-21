@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.fest.assertions.Assertions;
 import org.quartz.Calendar;
 import org.quartz.JobDetail;
@@ -25,6 +27,7 @@ import org.testng.internal.annotations.Sets;
 import com.beust.jcommander.internal.Maps;
 import com.google.common.collect.Lists;
 
+@Slf4j
 public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 	@Test
@@ -464,6 +467,77 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
 		Trigger trigger4 = buildAndStoreTrigger();
 		assertThat(hazelcastJobStore.getTriggerState(trigger4.getKey())).isEqualTo(TriggerState.NORMAL);
+	}
 
+	@Test
+	public void testPauseJob() throws ObjectAlreadyExistsException, JobPersistenceException {
+		JobDetail jobDetail = buildAndStoreJob();
+		Trigger trigger = buildTrigger(jobDetail);
+		storeTrigger(trigger);
+		TriggerState triggerState = hazelcastJobStore.getTriggerState(trigger.getKey());
+		assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+
+		hazelcastJobStore.pauseJob(jobDetail.getKey());
+
+		triggerState = hazelcastJobStore.getTriggerState(trigger.getKey());
+		assertThat(triggerState).isEqualTo(TriggerState.PAUSED);
+	}
+
+	@Test
+	public void testResumeJob() throws ObjectAlreadyExistsException, JobPersistenceException {
+		JobDetail jobDetail = buildAndStoreJob();
+		Trigger trigger = buildTrigger(jobDetail);
+		storeTrigger(trigger);
+		TriggerState triggerState = hazelcastJobStore.getTriggerState(trigger.getKey());
+		assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+
+		hazelcastJobStore.pauseJob(jobDetail.getKey());
+
+		triggerState = hazelcastJobStore.getTriggerState(trigger.getKey());
+		assertThat(triggerState).isEqualTo(TriggerState.PAUSED);
+
+		hazelcastJobStore.resumeJob(jobDetail.getKey());
+
+		triggerState = hazelcastJobStore.getTriggerState(trigger.getKey());
+		assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+	}
+
+	@Test
+	public void testPauseJobs() throws ObjectAlreadyExistsException, JobPersistenceException {
+		JobDetail job1 = buildAndStoreJobWithTrigger();
+		JobDetail job2 = buildAndStoreJobWithTrigger();
+
+		JobDetail job3 = buildJob("job3", "newgroup");
+		storeJob(job3);
+		storeTrigger(buildTrigger(job3));
+		List<OperableTrigger> triggersForJob = hazelcastJobStore.getTriggersForJob(job1.getKey());
+		triggersForJob.addAll(hazelcastJobStore.getTriggersForJob(job2.getKey()));
+		for (OperableTrigger trigger : triggersForJob) {
+			assertThat(hazelcastJobStore.getTriggerState(trigger.getKey())).isEqualTo(TriggerState.NORMAL);
+		}
+
+		Collection<String> pauseJobs = hazelcastJobStore.pauseJobs(GroupMatcher
+				.jobGroupEquals(job1.getKey().getGroup()));
+
+		assertThat(pauseJobs).containsOnly(job1.getKey().getGroup());
+
+		JobDetail job4 = buildAndStoreJobWithTrigger();
+
+		triggersForJob = hazelcastJobStore.getTriggersForJob(job1.getKey());
+		triggersForJob.addAll(hazelcastJobStore.getTriggersForJob(job2.getKey()));
+		triggersForJob.addAll(hazelcastJobStore.getTriggersForJob(job4.getKey()));
+		for (OperableTrigger trigger : triggersForJob) {
+			log.debug("Should be PAUSED for trigger : [" + trigger.getKey() + "] and job [" + trigger.getJobKey() + "]");
+			assertThat(hazelcastJobStore.getTriggerState(trigger.getKey())).isEqualTo(TriggerState.PAUSED)
+					.overridingErrorMessage(
+							"Should be PAUSED for trigger : [" + trigger.getKey() + "] and job [" + trigger.getJobKey()
+									+ "]");
+		}
+
+		triggersForJob = hazelcastJobStore.getTriggersForJob(job3.getKey());
+
+		for (OperableTrigger trigger : triggersForJob) {
+			assertThat(hazelcastJobStore.getTriggerState(trigger.getKey())).isEqualTo(TriggerState.NORMAL);
+		}
 	}
 }
