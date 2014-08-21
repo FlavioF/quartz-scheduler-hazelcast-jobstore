@@ -10,7 +10,9 @@
 		</encoder>
 	</appender>
 
-	<root level="debug">
+	<logger name="org.ameausoone" level="DEBUG"/>
+	 
+	<root level="info">
 		<appender-ref ref="STDOUT" />
 	</root>
 </configuration>
