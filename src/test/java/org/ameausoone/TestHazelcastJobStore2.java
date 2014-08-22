@@ -1,15 +1,22 @@
 package org.ameausoone;
 
 import static org.fest.assertions.Assertions.assertThat;
+import static org.testng.Assert.assertEquals;
 
+import java.util.Date;
+
+import org.quartz.DateBuilder;
 import org.quartz.JobBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
+import org.quartz.JobPersistenceException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
+import org.quartz.impl.JobDetailImpl;
 import org.quartz.impl.matchers.GroupMatcher;
+import org.quartz.impl.triggers.SimpleTriggerImpl;
 import org.quartz.spi.JobStore;
 import org.quartz.spi.OperableTrigger;
 import org.testng.Assert;
@@ -116,5 +123,47 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 				.overridingErrorMessage("Wrong number of triggers in group matching 'a'");
 		assertThat(hazelcastJobStore.getTriggerKeys(GroupMatcher.anyTriggerGroup()).size()).isEqualTo(15)
 				.overridingErrorMessage("Wrong number of triggers in any group");
+	}
+
+	@SuppressWarnings("deprecation")
+	@Test
+	public void testAcquireNextTriggers() throws JobPersistenceException {
+
+		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
+		long baseFireTime = baseFireTimeDate.getTime();
+		JobDetailImpl fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
+		fJobDetail.setDurability(true);
+		hazelcastJobStore.storeJob(fJobDetail, false);
+		OperableTrigger trigger1 = new SimpleTriggerImpl("trigger1", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
+		OperableTrigger trigger2 = new SimpleTriggerImpl("trigger2", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 50000), new Date(baseFireTime + 200000), 2, 2000);
+		OperableTrigger trigger3 = new SimpleTriggerImpl("trigger1", "triggerGroup2", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 100000), new Date(baseFireTime + 200000), 2, 2000);
+
+		trigger1.computeFirstFireTime(null);
+		trigger2.computeFirstFireTime(null);
+		trigger3.computeFirstFireTime(null);
+		hazelcastJobStore.storeTrigger(trigger1, false);
+		hazelcastJobStore.storeTrigger(trigger2, false);
+		hazelcastJobStore.storeTrigger(trigger3, false);
+
+		long firstFireTime = new Date(trigger1.getNextFireTime().getTime()).getTime();
+
+		assertThat(hazelcastJobStore.acquireNextTriggers(10, 1, 0L).isEmpty());
+		assertEquals(trigger2.getKey(), hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0)
+				.getKey());
+		assertEquals(trigger3.getKey(), hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0)
+				.getKey());
+		assertEquals(trigger1.getKey(), hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0)
+				.getKey());
+		Assert.assertTrue(hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).isEmpty());
+
+		// release trigger3
+		hazelcastJobStore.releaseAcquiredTrigger(trigger3);
+		assertEquals(
+				trigger3,
+				hazelcastJobStore.acquireNextTriggers(new Date(trigger1.getNextFireTime().getTime()).getTime() + 10000,
+						1, 1L).get(0));
 	}
 }
