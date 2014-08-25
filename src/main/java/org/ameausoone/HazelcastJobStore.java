@@ -53,31 +53,6 @@ public class HazelcastJobStore implements JobStore {
 
 	private final Logger log = LoggerFactory.getLogger(HazelcastJobStore.class);
 
-	/**
-	 * Suffix to identify job's map in Hazelcast storage.
-	 */
-	private static final String JOB_MAP_KEY = "JobMap";
-
-	private static final String JOBKEY_BY_GROUP_MAP_KEY = "JobByGroupMap";
-
-	/**
-	 * Suffix to identify trigger's map in Hazelcast storage.
-	 */
-	private static final String TRIGGER_MAP_KEY = "TriggerMap";
-
-	private static final String TRIGGERKEY_BY_GROUP_MAP_KEY = "TriggerByGroupMap";
-
-	/**
-	 * Suffix to identify trigger state's map in Hazelcast storage.
-	 */
-	private static final String TRIGGER_STATE_MAP_KEY = "TriggerStateMap";
-
-	private static final String CALENDAR_MAP_KEY = "CalendarMap";
-
-	private static final String PAUSED_TRIGGER_GROUP_SET_KEY = "PausedTriggerGroupSet";
-
-	private static final String PAUSED_JOB_GROUP_SET_KEY = "PausedJobGroupSet";
-
 	private String instanceName;
 
 	private SchedulerSignaler schedSignaler;
@@ -157,43 +132,47 @@ public class HazelcastJobStore implements JobStore {
 	 * @return Map which contains Jobs.
 	 */
 	private IMap<JobKey, JobDetail> getJobMap() {
-		return hazelcastClient.getMap(instanceName + '-' + JOB_MAP_KEY);
+		return hazelcastClient.getMap(instanceName + '-' + "JobMap"
+
+		);
 	}
 
 	/**
 	 * JobKeys by group name return a Multimap which map a groupName to a List of JobKeys
 	 */
 	private MultiMap<String, JobKey> getJobKeyByGroupMap() {
-		return hazelcastClient.getMultiMap(instanceName + '-' + JOBKEY_BY_GROUP_MAP_KEY);
+		return hazelcastClient.getMultiMap(instanceName + '-' + "JobByGroupMap");
 	}
 
 	/**
 	 * @return Map which contains Trigger by TriggerKey.
 	 */
-	private IMap<TriggerKey, Trigger> getTriggerByKeyMap() {
-		return hazelcastClient.getMap(instanceName + '-' + TRIGGER_MAP_KEY);
+	private IMap<TriggerKey, TriggerWrapper> getTriggerByKeyMap() {
+		return hazelcastClient.getMap(instanceName + '-' + "TriggerMap");
 	}
 
 	/**
 	 * TriggerKeys by Trigger group name
 	 */
 	private MultiMap<String, TriggerKey> getTriggerKeyByGroupMap() {
-		return hazelcastClient.getMultiMap(instanceName + '-' + TRIGGERKEY_BY_GROUP_MAP_KEY);
+		return hazelcastClient.getMultiMap(instanceName + '-' + "TriggerByGroupMap");
 	}
 
 	/**
 	 * @return Map which contains Trigger by TriggerKey.
 	 */
-	private IMap<TriggerKey, TriggerState> getTriggerStateMap() {
-		return hazelcastClient.getMap(instanceName + '-' + TRIGGER_STATE_MAP_KEY);
-	}
+	// private IMap<TriggerKey, TriggerState> getTriggerStateMap() {
+	// return hazelcastClient.getMap(instanceName + '-' + "TriggerStateMap"
+	//
+	// );
+	// }
 
 	private ISet<String> getHZPausedTriggerGroups() {
-		return hazelcastClient.getSet(instanceName + '-' + PAUSED_TRIGGER_GROUP_SET_KEY);
+		return hazelcastClient.getSet(instanceName + '-' + "PausedTriggerGroupSet");
 	}
 
 	private ISet<String> getPausedJobGroups() {
-		return hazelcastClient.getSet(instanceName + '-' + PAUSED_JOB_GROUP_SET_KEY);
+		return hazelcastClient.getSet(instanceName + '-' + "PausedJobGroupSet");
 	}
 
 	public void storeJobAndTrigger(JobDetail newJob, OperableTrigger newTrigger) throws ObjectAlreadyExistsException,
@@ -284,11 +263,9 @@ public class HazelcastJobStore implements JobStore {
 	public void storeTrigger(OperableTrigger trigger, boolean replaceExisting) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
 		OperableTrigger newTrigger = (OperableTrigger) trigger.clone();
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
-		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
+		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
 		TriggerKey triggerKey = newTrigger.getKey();
 		triggerMap.lock(triggerKey);
-		triggerStateMap.lock(triggerKey);
 		try {
 			boolean containsKey = triggerMap.containsKey(triggerKey);
 			if (containsKey && !replaceExisting)
@@ -298,37 +275,32 @@ public class HazelcastJobStore implements JobStore {
 				throw new JobPersistenceException("The job (" + newTrigger.getJobKey()
 						+ ") referenced by the trigger does not exist.");
 
-			triggerMap.put(triggerKey, newTrigger);
-
 			boolean shouldBePausedByJobGroup = getPausedJobGroups().contains(newTrigger.getJobKey().getGroup());
 			boolean shouldBePausedByTriggerGroup = getHZPausedTriggerGroups().contains(triggerKey.getGroup());
 			boolean shouldBePaused = shouldBePausedByJobGroup || shouldBePausedByTriggerGroup;
 			TriggerState state = shouldBePaused ? PAUSED : NORMAL;
 
-			triggerStateMap.put(triggerKey, state);
+			TriggerWrapper tw = new TriggerWrapper(newTrigger);
+			tw.state = state;
+			triggerMap.put(triggerKey, tw);
 
 			getTriggerKeyByGroupMap().put(triggerKey.getGroup(), triggerKey);
 		} finally {
 			triggerMap.unlock(triggerKey);
-			triggerStateMap.unlock(triggerKey);
 		}
 	}
 
 	public boolean removeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO implement remove orphanedJob
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
-		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
+		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
 		boolean found = triggerMap.containsKey(triggerKey);
 		if (found) {
 			triggerMap.lock(triggerKey);
-			triggerStateMap.lock(triggerKey);
 			try {
 				getTriggerKeyByGroupMap().remove(triggerKey.getGroup(), triggerKey);
 				triggerMap.remove(triggerKey);
-				triggerStateMap.remove(triggerKey);
 			} finally {
 				triggerMap.unlock(triggerKey);
-				triggerStateMap.unlock(triggerKey);
 			}
 		}
 		return found;
@@ -353,8 +325,11 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public OperableTrigger retrieveTrigger(TriggerKey triggerKey) throws JobPersistenceException {
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
-		return (OperableTrigger) triggerMap.get(triggerKey);
+		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
+		TriggerWrapper triggerWrapper = triggerMap.get(triggerKey);
+		if (triggerWrapper == null)
+			return null;
+		return (OperableTrigger) triggerWrapper.getTrigger();
 	}
 
 	public boolean checkExists(JobKey jobKey) throws JobPersistenceException {
@@ -363,7 +338,7 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public boolean checkExists(TriggerKey triggerKey) throws JobPersistenceException {
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
+		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
 		return triggerMap.containsKey(triggerKey);
 	}
 
@@ -397,7 +372,7 @@ public class HazelcastJobStore implements JobStore {
 	 * @return Map which contains Jobs.
 	 */
 	private IMap<String, Calendar> getCalendarMap() {
-		IMap<String, Calendar> calendarMap = hazelcastClient.getMap(instanceName + CALENDAR_MAP_KEY);
+		IMap<String, Calendar> calendarMap = hazelcastClient.getMap(instanceName + "CalendarMap");
 		return calendarMap;
 	}
 
@@ -529,43 +504,53 @@ public class HazelcastJobStore implements JobStore {
 		// java.io.NotSerializableException: org.ameausoone.HazelcastJobStore."
 		if (jobKey == null)
 			return Collections.emptyList();
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
-		Collection<Trigger> values = triggerMap.values();
+		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
+		Collection<TriggerWrapper> values = triggerMap.values();
 		List<OperableTrigger> outList = Lists.newArrayList();
-		for (Trigger trigger : values) {
-			if (jobKey.equals(trigger.getJobKey()))
-				outList.add((OperableTrigger) trigger);
+		for (TriggerWrapper tw : values) {
+			if (jobKey.equals(tw.getTrigger().getJobKey()))
+				outList.add((OperableTrigger) tw.getTrigger());
 		}
 		return outList;
 	}
 
 	public void pauseTrigger(TriggerKey triggerKey) throws JobPersistenceException {
-		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
-		triggerStateMap.lock(triggerKey);
+		// IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
+		IMap<TriggerKey, TriggerWrapper> triggerByKeyMap = getTriggerByKeyMap();
+
+		triggerByKeyMap.lock(triggerKey);
 		try {
-			triggerStateMap.put(triggerKey, PAUSED);
+			TriggerWrapper tw = triggerByKeyMap.get(triggerKey);
+			tw.state = TriggerState.PAUSED;
+			triggerByKeyMap.put(triggerKey, tw);
 		} finally {
-			triggerStateMap.unlock(triggerKey);
+			triggerByKeyMap.unlock(triggerKey);
 		}
 	}
 
 	public TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
-		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
-		triggerStateMap.lock(triggerKey);
+		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
+		triggerMap.lock(triggerKey);
+		TriggerState state = null;
 		try {
-			return triggerStateMap.get(triggerKey);
+			TriggerWrapper tw = triggerMap.get(triggerKey);
+			if (tw != null)
+				state = tw.state;
 		} finally {
-			triggerStateMap.unlock(triggerKey);
+			triggerMap.unlock(triggerKey);
 		}
+		return state;
 	}
 
 	public void resumeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
-		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
-		triggerStateMap.lock(triggerKey);
+		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
+		triggerMap.lock(triggerKey);
 		try {
-			triggerStateMap.put(triggerKey, TriggerState.NORMAL);
+			TriggerWrapper tw = triggerMap.get(triggerKey);
+			tw.state = NORMAL;
+			triggerMap.put(triggerKey, tw);
 		} finally {
-			triggerStateMap.unlock(triggerKey);
+			triggerMap.unlock(triggerKey);
 		}
 	}
 
@@ -605,7 +590,9 @@ public class HazelcastJobStore implements JobStore {
 
 		for (TriggerKey triggerKey : keys) {
 			resumeGroups.add(triggerKey.getGroup());
-			String jobGroup = getTriggerByKeyMap().get(triggerKey).getJobKey().getGroup();
+			TriggerWrapper tw = getTriggerByKeyMap().get(triggerKey);
+			OperableTrigger trigger = tw.getTrigger();
+			String jobGroup = trigger.getJobKey().getGroup();
 			if (getPausedJobGroups().contains(jobGroup)) {
 				continue;
 			}
@@ -715,7 +702,7 @@ public class HazelcastJobStore implements JobStore {
 
 	public List<OperableTrigger> acquireNextTriggers(long noLaterThan, int maxCount, long timeWindow)
 			throws JobPersistenceException {
-		IMap<TriggerKey, Trigger> triggerByKeyMap = getTriggerByKeyMap();
+		IMap<TriggerKey, TriggerWrapper> triggerByKeyMap = getTriggerByKeyMap();
 		Trigger trigger;
 		return null;
 	}
