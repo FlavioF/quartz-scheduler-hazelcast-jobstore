@@ -170,7 +170,7 @@ public class HazelcastJobStore implements JobStore {
 	/**
 	 * @return Map which contains Trigger by TriggerKey.
 	 */
-	private IMap<TriggerKey, Trigger> getTriggerMap() {
+	private IMap<TriggerKey, Trigger> getTriggerByKeyMap() {
 		return hazelcastClient.getMap(instanceName + '-' + TRIGGER_MAP_KEY);
 	}
 
@@ -203,8 +203,9 @@ public class HazelcastJobStore implements JobStore {
 
 	}
 
-	public void storeJob(JobDetail newJob, boolean replaceExisting) throws ObjectAlreadyExistsException,
+	public void storeJob(JobDetail job, boolean replaceExisting) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
+		JobDetail newJob = (JobDetail) job.clone();
 		IMap<JobKey, JobDetail> jobMap = getJobMap();
 		JobKey newJobKey = newJob.getKey();
 		boolean containsKey = jobMap.containsKey(newJobKey);
@@ -280,9 +281,10 @@ public class HazelcastJobStore implements JobStore {
 		return null;
 	}
 
-	public void storeTrigger(OperableTrigger newTrigger, boolean replaceExisting) throws ObjectAlreadyExistsException,
+	public void storeTrigger(OperableTrigger trigger, boolean replaceExisting) throws ObjectAlreadyExistsException,
 			JobPersistenceException {
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		OperableTrigger newTrigger = (OperableTrigger) trigger.clone();
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
 		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
 		TriggerKey triggerKey = newTrigger.getKey();
 		triggerMap.lock(triggerKey);
@@ -314,7 +316,7 @@ public class HazelcastJobStore implements JobStore {
 
 	public boolean removeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
 		// TODO implement remove orphanedJob
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
 		IMap<TriggerKey, TriggerState> triggerStateMap = getTriggerStateMap();
 		boolean found = triggerMap.containsKey(triggerKey);
 		if (found) {
@@ -351,7 +353,7 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public OperableTrigger retrieveTrigger(TriggerKey triggerKey) throws JobPersistenceException {
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
 		return (OperableTrigger) triggerMap.get(triggerKey);
 	}
 
@@ -361,12 +363,12 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public boolean checkExists(TriggerKey triggerKey) throws JobPersistenceException {
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
 		return triggerMap.containsKey(triggerKey);
 	}
 
 	public void clearAllSchedulingData() throws JobPersistenceException {
-		for (TriggerKey triggerKey : getTriggerMap().keySet()) {
+		for (TriggerKey triggerKey : getTriggerByKeyMap().keySet()) {
 			removeTrigger(triggerKey);
 		}
 
@@ -427,7 +429,7 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public int getNumberOfTriggers() throws JobPersistenceException {
-		return getTriggerMap().size();
+		return getTriggerByKeyMap().size();
 	}
 
 	public int getNumberOfCalendars() throws JobPersistenceException {
@@ -510,7 +512,7 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public List<String> getTriggerGroupNames() throws JobPersistenceException {
-		Set<TriggerKey> triggerKeys = getTriggerMap().keySet();
+		Set<TriggerKey> triggerKeys = getTriggerByKeyMap().keySet();
 		Set<String> groupNames = newHashSet();
 		for (TriggerKey triggerKey : triggerKeys) {
 			groupNames.add(triggerKey.getGroup());
@@ -527,7 +529,7 @@ public class HazelcastJobStore implements JobStore {
 		// java.io.NotSerializableException: org.ameausoone.HazelcastJobStore."
 		if (jobKey == null)
 			return Collections.emptyList();
-		IMap<TriggerKey, Trigger> triggerMap = getTriggerMap();
+		IMap<TriggerKey, Trigger> triggerMap = getTriggerByKeyMap();
 		Collection<Trigger> values = triggerMap.values();
 		List<OperableTrigger> outList = Lists.newArrayList();
 		for (Trigger trigger : values) {
@@ -603,7 +605,7 @@ public class HazelcastJobStore implements JobStore {
 
 		for (TriggerKey triggerKey : keys) {
 			resumeGroups.add(triggerKey.getGroup());
-			String jobGroup = getTriggerMap().get(triggerKey).getJobKey().getGroup();
+			String jobGroup = getTriggerByKeyMap().get(triggerKey).getJobKey().getGroup();
 			if (getPausedJobGroups().contains(jobGroup)) {
 				continue;
 			}
@@ -713,7 +715,8 @@ public class HazelcastJobStore implements JobStore {
 
 	public List<OperableTrigger> acquireNextTriggers(long noLaterThan, int maxCount, long timeWindow)
 			throws JobPersistenceException {
-		// TODO Auto-generated method stub
+		IMap<TriggerKey, Trigger> triggerByKeyMap = getTriggerByKeyMap();
+		Trigger trigger;
 		return null;
 	}
 
