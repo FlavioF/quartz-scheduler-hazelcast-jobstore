@@ -138,7 +138,7 @@ public abstract class AbstractTestHazelcastJobStore {
 		SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
 		Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, groupName).withSchedule(schedule)
 				.forJob(jobDetail).build();
-
+		((OperableTrigger) trigger).computeFirstFireTime(null);
 		return trigger;
 	}
 

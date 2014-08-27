@@ -134,6 +134,7 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 		JobDetailImpl fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
 		fJobDetail.setDurability(true);
 		hazelcastJobStore.storeJob(fJobDetail, false);
+
 		OperableTrigger trigger1 = new SimpleTriggerImpl("trigger1", "triggerGroup1", fJobDetail.getName(),
 				fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
 		OperableTrigger trigger2 = new SimpleTriggerImpl("trigger2", "triggerGroup1", fJobDetail.getName(),

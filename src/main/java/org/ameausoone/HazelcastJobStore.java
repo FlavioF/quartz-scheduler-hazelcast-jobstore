@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.ISet;
 import com.hazelcast.core.MultiMap;
+import com.hazelcast.query.SqlPredicate;
 
 /**
  * @author Antoine Méausoone
@@ -65,6 +67,12 @@ public class HazelcastJobStore implements JobStore {
 
 	private HazelcastInstance hazelcastClient;
 
+	protected String instanceId;
+
+	public String getInstanceId() {
+		return instanceId;
+	}
+
 	public void initialize(ClassLoadHelper loadHelper, SchedulerSignaler signaler) throws SchedulerConfigException {
 
 		this.schedSignaler = signaler;
@@ -75,6 +83,7 @@ public class HazelcastJobStore implements JobStore {
 		networkConfig.addAddress("127.0.0.1:5701");
 
 		hazelcastClient = HazelcastClient.newHazelcastClient(clientConfig);
+		getTriggerByKeyMap().addIndex("nextFireTime", true);
 	}
 
 	public void schedulerStarted() throws SchedulerException {
@@ -132,9 +141,7 @@ public class HazelcastJobStore implements JobStore {
 	 * @return Map which contains Jobs.
 	 */
 	private IMap<JobKey, JobDetail> getJobMap() {
-		return hazelcastClient.getMap(instanceName + '-' + "JobMap"
-
-		);
+		return hazelcastClient.getMap(instanceName + '-' + "JobMap");
 	}
 
 	/**
@@ -700,11 +707,108 @@ public class HazelcastJobStore implements JobStore {
 		}
 	}
 
+	/**
+	 * @see org.quartz.spi.JobStore#acquireNextTriggers(long, int, long)
+	 * 
+	 * @param noLaterThan
+	 *            highest value of <code>getNextFireTime()</code> of the triggers (exclusive)
+	 * @param timeWindow
+	 *            highest value of <code>getNextFireTime()</code> of the triggers (inclusive)
+	 * @param maxCount
+	 *            maximum number of trigger keys allow to acquired in the returning list.
+	 */
 	public List<OperableTrigger> acquireNextTriggers(long noLaterThan, int maxCount, long timeWindow)
 			throws JobPersistenceException {
+
+		List<OperableTrigger> result = new ArrayList<OperableTrigger>();
+		Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<JobKey>();
+		Set<TriggerWrapper> excludedTriggers = new HashSet<TriggerWrapper>();
+		long firstAcquiredTriggerFireTime = 0;
+
 		IMap<TriggerKey, TriggerWrapper> triggerByKeyMap = getTriggerByKeyMap();
-		Trigger trigger;
-		return null;
+		long noEarlierThan = getMisfireTime();
+		long noLaterThanWithTimeWindow = noLaterThan + timeWindow;
+
+		Collection<TriggerWrapper> timeTriggers = triggerByKeyMap.values(new SqlPredicate("nextFireTime between "
+				+ noEarlierThan + " and " + noLaterThanWithTimeWindow));
+
+		// return empty list if store has no triggers.
+		// if (timeTriggers.size() == 0)
+		// return result;
+		Iterator<TriggerWrapper> iterator = timeTriggers.iterator();
+		while (true) {
+			TriggerWrapper tw;
+
+			try {
+				tw = iterator.next();
+				if (tw == null)
+					break;
+				// timeTriggers.remove(tw);
+			} catch (java.util.NoSuchElementException nsee) {
+				break;
+			}
+
+			if (tw.trigger.getNextFireTime() == null) {
+				continue;
+			}
+
+			// if (applyMisfire(tw)) {
+			// if (tw.trigger.getNextFireTime() != null) {
+			// timeTriggers.add(tw);
+			// }
+			// continue;
+			// }
+
+			// if (tw.getTrigger().getNextFireTime().getTime() > noLaterThan + timeWindow) {
+			// timeTriggers.add(tw);
+			// break;
+			// }
+
+			// If trigger's job is set as @DisallowConcurrentExecution, and it has already been added to result,
+			// then
+			// put it back into the timeTriggers set and continue to search for next trigger.
+			// JobKey jobKey = tw.trigger.getJobKey();
+			// JobDetail job = jobsByKey.get(tw.trigger.getJobKey()).jobDetail;
+			// if (job.isConcurrentExectionDisallowed()) {
+			// if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
+			// excludedTriggers.add(tw);
+			// continue; // go to next trigger in store.
+			// } else {
+			// acquiredJobKeysForNoConcurrentExec.add(jobKey);
+			// }
+			// }
+
+			tw.state = TriggerState.NORMAL;
+			tw.trigger.setFireInstanceId(getFiredTriggerRecordId());
+			OperableTrigger trig = (OperableTrigger) tw.trigger.clone();
+			result.add(trig);
+			if (firstAcquiredTriggerFireTime == 0)
+				firstAcquiredTriggerFireTime = tw.trigger.getNextFireTime().getTime();
+
+			if (result.size() == maxCount)
+				break;
+		}
+
+		// If we did excluded triggers to prevent ACQUIRE state due to DisallowConcurrentExecution, we need to add
+		// them back to store.
+		if (excludedTriggers.size() > 0)
+			timeTriggers.addAll(excludedTriggers);
+		return result;
+	}
+
+	protected long getMisfireTime() {
+		long misfireTime = System.currentTimeMillis();
+		if (getMisfireThreshold() > 0) {
+			misfireTime -= getMisfireThreshold();
+		}
+
+		return (misfireTime > 0) ? misfireTime : 0;
+	}
+
+	private static long ftrCtr = System.currentTimeMillis();
+
+	protected synchronized String getFiredTriggerRecordId() {
+		return getInstanceId() + ftrCtr++;
 	}
 
 	public void releaseAcquiredTrigger(OperableTrigger trigger) {

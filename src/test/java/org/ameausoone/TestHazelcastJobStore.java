@@ -3,6 +3,8 @@ package org.ameausoone;
 import static org.fest.assertions.Assertions.assertThat;
 
 import java.util.Collection;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.fest.assertions.Assertions;
 import org.quartz.Calendar;
+import org.quartz.DateBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
@@ -18,14 +21,22 @@ import org.quartz.ObjectAlreadyExistsException;
 import org.quartz.Trigger;
 import org.quartz.Trigger.TriggerState;
 import org.quartz.TriggerKey;
+import org.quartz.impl.JobDetailImpl;
 import org.quartz.impl.calendar.BaseCalendar;
 import org.quartz.impl.matchers.GroupMatcher;
+import org.quartz.impl.triggers.SimpleTriggerImpl;
 import org.quartz.spi.OperableTrigger;
 import org.testng.annotations.Test;
 import org.testng.internal.annotations.Sets;
 
 import com.beust.jcommander.internal.Maps;
 import com.google.common.collect.Lists;
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.client.config.ClientNetworkConfig;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
+import com.hazelcast.query.SqlPredicate;
 
 @Slf4j
 public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
@@ -639,6 +650,52 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 		assertThat(hazelcastJobStore.getTriggerState(trigger.getKey())).isEqualTo(TriggerState.NORMAL);
 		assertThat(hazelcastJobStore.getTriggerState(trigger2.getKey())).isEqualTo(TriggerState.NORMAL);
 		assertThat(hazelcastJobStore.getTriggerState(trigger3.getKey())).isEqualTo(TriggerState.NORMAL);
+	}
 
+	@SuppressWarnings("deprecation")
+	@Test
+	public void testOrderedTriggerList() {
+		ClientConfig clientConfig = new ClientConfig();
+		ClientNetworkConfig networkConfig = clientConfig.getNetworkConfig();
+		networkConfig.addAddress("127.0.0.1:5701");
+
+		HazelcastInstance hazelcastClient = HazelcastClient.newHazelcastClient(clientConfig);
+		IMap<TriggerKey, TriggerWrapper> triggersByKey = hazelcastClient.getMap("TriggerMapOrderedTest");
+		triggersByKey.addIndex("nextFireTime", true);
+
+		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
+		long baseFireTime = baseFireTimeDate.getTime();
+		JobDetailImpl fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
+		fJobDetail.setDurability(true);
+
+		OperableTrigger trigger1 = new SimpleTriggerImpl("trigger1", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
+		trigger1.computeFirstFireTime(null);
+		OperableTrigger trigger2 = new SimpleTriggerImpl("trigger2", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 50000), new Date(baseFireTime + 200000), 2, 2000);
+		trigger2.computeFirstFireTime(null);
+		OperableTrigger trigger3 = new SimpleTriggerImpl("trigger3", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 100000), new Date(baseFireTime + 200000), 2, 2000);
+		trigger3.computeFirstFireTime(null);
+		OperableTrigger trigger4 = new SimpleTriggerImpl("trigger4", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 150000), new Date(baseFireTime + 200000), 2, 2000);
+		trigger4.computeFirstFireTime(null);
+
+		triggersByKey.put(trigger4.getKey(), new TriggerWrapper(trigger4));
+		triggersByKey.put(trigger1.getKey(), new TriggerWrapper(trigger1));
+		triggersByKey.put(trigger3.getKey(), new TriggerWrapper(trigger3));
+		triggersByKey.put(trigger2.getKey(), new TriggerWrapper(trigger2));
+
+		Collection<TriggerWrapper> values = triggersByKey.values(new SqlPredicate("nextFireTime between "
+				+ new Date(baseFireTime + 49000).getTime() + " and " + new Date(baseFireTime + 51000).getTime()));
+		assertThat(values).containsOnly(new TriggerWrapper(trigger2));
+
+		values = triggersByKey.values(new SqlPredicate("nextFireTime between "
+				+ new Date(baseFireTime + 99000).getTime() + " and " + new Date(baseFireTime + 200001).getTime()));
+		Iterator<TriggerWrapper> iterator = values.iterator();
+		assertThat(iterator.next()).isEqualTo(new TriggerWrapper(trigger3));
+		assertThat(iterator.next()).isEqualTo(new TriggerWrapper(trigger4));
+		assertThat(iterator.next()).isEqualTo(new TriggerWrapper(trigger1));
+		assertThat(iterator.hasNext()).isFalse();
 	}
 }
