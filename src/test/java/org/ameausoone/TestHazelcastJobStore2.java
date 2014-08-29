@@ -139,25 +139,25 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 				fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200000), 2, 2000);
 		OperableTrigger trigger2 = new SimpleTriggerImpl("trigger2", "triggerGroup1", fJobDetail.getName(),
 				fJobDetail.getGroup(), new Date(baseFireTime + 50000), new Date(baseFireTime + 200000), 2, 2000);
-		OperableTrigger trigger3 = new SimpleTriggerImpl("trigger1", "triggerGroup2", fJobDetail.getName(),
+		OperableTrigger trigger3 = new SimpleTriggerImpl("trigger3", "triggerGroup1", fJobDetail.getName(),
 				fJobDetail.getGroup(), new Date(baseFireTime + 100000), new Date(baseFireTime + 200000), 2, 2000);
 
 		trigger1.computeFirstFireTime(null);
 		trigger2.computeFirstFireTime(null);
 		trigger3.computeFirstFireTime(null);
 		hazelcastJobStore.storeTrigger(trigger1, false);
-		hazelcastJobStore.storeTrigger(trigger2, false);
 		hazelcastJobStore.storeTrigger(trigger3, false);
+		hazelcastJobStore.storeTrigger(trigger2, false);
 
 		long firstFireTime = new Date(trigger1.getNextFireTime().getTime()).getTime();
 
 		assertThat(hazelcastJobStore.acquireNextTriggers(10, 1, 0L).isEmpty());
-		assertEquals(trigger2.getKey(), hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0)
-				.getKey());
-		assertEquals(trigger3.getKey(), hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0)
-				.getKey());
-		assertEquals(trigger1.getKey(), hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0)
-				.getKey());
+		assertThat(hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0).getKey()).isEqualTo(
+				trigger2.getKey());
+		assertThat(hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0).getKey()).isEqualTo(
+				trigger3.getKey());
+		assertThat(hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).get(0).getKey()).isEqualTo(
+				trigger1.getKey());
 		Assert.assertTrue(hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 1, 0L).isEmpty());
 
 		// release trigger3

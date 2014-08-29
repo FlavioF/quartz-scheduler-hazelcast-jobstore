@@ -2,8 +2,11 @@ package org.ameausoone;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
-import static org.quartz.Trigger.TriggerState.NORMAL;
-import static org.quartz.Trigger.TriggerState.PAUSED;
+import static org.ameausoone.TriggerState.ACQUIRED;
+import static org.ameausoone.TriggerState.NORMAL;
+import static org.ameausoone.TriggerState.PAUSED;
+import static org.ameausoone.TriggerState.toClassicTriggerState;
+import static org.ameausoone.TriggerWrapper.newTriggerWrapper;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,7 +28,6 @@ import org.quartz.SchedulerConfigException;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.Trigger.CompletedExecutionInstruction;
-import org.quartz.Trigger.TriggerState;
 import org.quartz.TriggerKey;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.quartz.impl.matchers.StringMatcher;
@@ -287,14 +289,17 @@ public class HazelcastJobStore implements JobStore {
 			boolean shouldBePaused = shouldBePausedByJobGroup || shouldBePausedByTriggerGroup;
 			TriggerState state = shouldBePaused ? PAUSED : NORMAL;
 
-			TriggerWrapper tw = new TriggerWrapper(newTrigger);
-			tw.state = state;
-			triggerMap.put(triggerKey, tw);
+			TriggerWrapper tw = newTriggerWrapper(newTrigger, state);
+			storeTriggerWrapper(tw);
 
 			getTriggerKeyByGroupMap().put(triggerKey.getGroup(), triggerKey);
 		} finally {
 			triggerMap.unlock(triggerKey);
 		}
+	}
+
+	private void storeTriggerWrapper(TriggerWrapper tw) {
+		getTriggerByKeyMap().put(tw.key, tw);
 	}
 
 	public boolean removeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
@@ -528,25 +533,24 @@ public class HazelcastJobStore implements JobStore {
 		triggerByKeyMap.lock(triggerKey);
 		try {
 			TriggerWrapper tw = triggerByKeyMap.get(triggerKey);
-			tw.state = TriggerState.PAUSED;
-			triggerByKeyMap.put(triggerKey, tw);
+			storeTriggerWrapper(newTriggerWrapper(tw, PAUSED));
 		} finally {
 			triggerByKeyMap.unlock(triggerKey);
 		}
 	}
 
-	public TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
+	public org.quartz.Trigger.TriggerState getTriggerState(TriggerKey triggerKey) throws JobPersistenceException {
 		IMap<TriggerKey, TriggerWrapper> triggerMap = getTriggerByKeyMap();
 		triggerMap.lock(triggerKey);
-		TriggerState state = null;
+		org.quartz.Trigger.TriggerState result = org.quartz.Trigger.TriggerState.NONE;
 		try {
 			TriggerWrapper tw = triggerMap.get(triggerKey);
 			if (tw != null)
-				state = tw.state;
+				result = toClassicTriggerState(tw.getState());
 		} finally {
 			triggerMap.unlock(triggerKey);
 		}
-		return state;
+		return result;
 	}
 
 	public void resumeTrigger(TriggerKey triggerKey) throws JobPersistenceException {
@@ -554,8 +558,7 @@ public class HazelcastJobStore implements JobStore {
 		triggerMap.lock(triggerKey);
 		try {
 			TriggerWrapper tw = triggerMap.get(triggerKey);
-			tw.state = NORMAL;
-			triggerMap.put(triggerKey, tw);
+			storeTriggerWrapper(TriggerWrapper.newTriggerWrapper(tw, NORMAL));
 		} finally {
 			triggerMap.unlock(triggerKey);
 		}
@@ -728,9 +731,11 @@ public class HazelcastJobStore implements JobStore {
 		IMap<TriggerKey, TriggerWrapper> triggerByKeyMap = getTriggerByKeyMap();
 		long noEarlierThan = getMisfireTime();
 		long noLaterThanWithTimeWindow = noLaterThan + timeWindow;
+		if (noLaterThanWithTimeWindow < noEarlierThan)
+			return Lists.newArrayList();
 
 		Collection<TriggerWrapper> timeTriggers = triggerByKeyMap.values(new SqlPredicate("nextFireTime between "
-				+ noEarlierThan + " and " + noLaterThanWithTimeWindow));
+				+ noEarlierThan + " and " + noLaterThanWithTimeWindow + " and state != ACQUIRED"));
 
 		// return empty list if store has no triggers.
 		// if (timeTriggers.size() == 0)
@@ -778,9 +783,9 @@ public class HazelcastJobStore implements JobStore {
 			// }
 			// }
 
-			tw.state = TriggerState.NORMAL;
-			tw.trigger.setFireInstanceId(getFiredTriggerRecordId());
 			OperableTrigger trig = (OperableTrigger) tw.trigger.clone();
+			trig.setFireInstanceId(getFiredTriggerRecordId());
+			storeTriggerWrapper(newTriggerWrapper(trig, ACQUIRED));
 			result.add(trig);
 			if (firstAcquiredTriggerFireTime == 0)
 				firstAcquiredTriggerFireTime = tw.trigger.getNextFireTime().getTime();

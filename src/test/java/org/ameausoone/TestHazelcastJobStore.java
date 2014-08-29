@@ -1,5 +1,6 @@
 package org.ameausoone;
 
+import static org.ameausoone.TriggerWrapper.newTriggerWrapper;
 import static org.fest.assertions.Assertions.assertThat;
 
 import java.util.Collection;
@@ -164,7 +165,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 		assertThat(removeTrigger).isFalse();
 
 		TriggerState triggerState = hazelcastJobStore.getTriggerState(triggerKey);
-		assertThat(triggerState).isNull();
+		assertThat(triggerState).isEqualTo(TriggerState.NONE);
 	}
 
 	@Test
@@ -681,21 +682,28 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 				fJobDetail.getGroup(), new Date(baseFireTime + 150000), new Date(baseFireTime + 200000), 2, 2000);
 		trigger4.computeFirstFireTime(null);
 
-		triggersByKey.put(trigger4.getKey(), new TriggerWrapper(trigger4));
-		triggersByKey.put(trigger1.getKey(), new TriggerWrapper(trigger1));
-		triggersByKey.put(trigger3.getKey(), new TriggerWrapper(trigger3));
-		triggersByKey.put(trigger2.getKey(), new TriggerWrapper(trigger2));
+		triggersByKey.put(trigger4.getKey(), newTriggerWrapper(trigger4));
+		triggersByKey.put(trigger1.getKey(), newTriggerWrapper(trigger1));
+		triggersByKey.put(trigger3.getKey(), newTriggerWrapper(trigger3));
+		triggersByKey.put(trigger2.getKey(), newTriggerWrapper(trigger2));
 
 		Collection<TriggerWrapper> values = triggersByKey.values(new SqlPredicate("nextFireTime between "
 				+ new Date(baseFireTime + 49000).getTime() + " and " + new Date(baseFireTime + 51000).getTime()));
-		assertThat(values).containsOnly(new TriggerWrapper(trigger2));
+		assertThat(values).containsOnly(newTriggerWrapper(trigger2));
 
 		values = triggersByKey.values(new SqlPredicate("nextFireTime between "
 				+ new Date(baseFireTime + 99000).getTime() + " and " + new Date(baseFireTime + 200001).getTime()));
 		Iterator<TriggerWrapper> iterator = values.iterator();
-		assertThat(iterator.next()).isEqualTo(new TriggerWrapper(trigger3));
-		assertThat(iterator.next()).isEqualTo(new TriggerWrapper(trigger4));
-		assertThat(iterator.next()).isEqualTo(new TriggerWrapper(trigger1));
+		assertThat(iterator.next()).isEqualTo(newTriggerWrapper(trigger3));
+		assertThat(iterator.next()).isEqualTo(newTriggerWrapper(trigger4));
+		assertThat(iterator.next()).isEqualTo(newTriggerWrapper(trigger1));
 		assertThat(iterator.hasNext()).isFalse();
+	}
+
+	@Test
+	public void testGetTriggerState() throws JobPersistenceException {
+		TriggerState triggerState = hazelcastJobStore.getTriggerState(new TriggerKey("noname"));
+		assertThat(triggerState).isEqualTo(TriggerState.NONE);
+
 	}
 }

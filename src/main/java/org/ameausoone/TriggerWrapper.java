@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.Date;
 
 import org.quartz.JobKey;
-import org.quartz.Trigger.TriggerState;
 import org.quartz.TriggerKey;
 import org.quartz.spi.OperableTrigger;
 
@@ -20,26 +19,40 @@ class TriggerWrapper implements Serializable {
 
 	public final OperableTrigger trigger;
 
-	public TriggerState state = TriggerState.NORMAL;
+	private final TriggerState state;
 
-	public final Long nextFireTime;
+	private final Long nextFireTime;
 
 	public Long getNextFireTime() {
 		return nextFireTime;
 	}
 
-	TriggerWrapper(OperableTrigger trigger) {
+	private TriggerWrapper(OperableTrigger trigger, TriggerState state) {
 		if (trigger == null)
 			throw new IllegalArgumentException("Trigger cannot be null!");
 		this.trigger = trigger;
 		key = trigger.getKey();
 		this.jobKey = trigger.getJobKey();
+		this.state = state;
 		Date nextFireTime2 = trigger.getNextFireTime();
 		if (nextFireTime2 != null) {
 			this.nextFireTime = nextFireTime2.getTime();
 		} else {
 			nextFireTime = null;
 		}
+	}
+
+	public static TriggerWrapper newTriggerWrapper(OperableTrigger trigger) {
+		return newTriggerWrapper(trigger, TriggerState.NORMAL);
+	}
+
+	public static TriggerWrapper newTriggerWrapper(TriggerWrapper tw, TriggerState state) {
+		return new TriggerWrapper(tw.trigger, state);
+	}
+
+	public static TriggerWrapper newTriggerWrapper(OperableTrigger trigger, TriggerState state) {
+		TriggerWrapper tw = new TriggerWrapper(trigger, state);
+		return tw;
 	}
 
 	@Override
@@ -65,9 +78,16 @@ class TriggerWrapper implements Serializable {
 
 	@Override
 	public String toString() {
-		return Objects.toStringHelper(this).add("key", key) //
-				.add("state", state) //
-				.add("nextFireTime", nextFireTime) //
+		return Objects.toStringHelper(this)//
+				.add("key", key) //
+				.add("jobKey", jobKey) //
+				.add("state", getState()) //
+				.add("nextFireTime", getNextFireTime()) //
 				.toString();
 	}
+
+	public TriggerState getState() {
+		return state;
+	}
+
 }
