@@ -5,6 +5,7 @@ import static com.google.common.collect.Sets.newHashSet;
 import static org.ameausoone.TriggerState.ACQUIRED;
 import static org.ameausoone.TriggerState.NORMAL;
 import static org.ameausoone.TriggerState.PAUSED;
+import static org.ameausoone.TriggerState.WAITING;
 import static org.ameausoone.TriggerState.toClassicTriggerState;
 import static org.ameausoone.TriggerWrapper.newTriggerWrapper;
 
@@ -166,15 +167,6 @@ public class HazelcastJobStore implements JobStore {
 	private MultiMap<String, TriggerKey> getTriggerKeyByGroupMap() {
 		return hazelcastClient.getMultiMap(instanceName + '-' + "TriggerByGroupMap");
 	}
-
-	/**
-	 * @return Map which contains Trigger by TriggerKey.
-	 */
-	// private IMap<TriggerKey, TriggerState> getTriggerStateMap() {
-	// return hazelcastClient.getMap(instanceName + '-' + "TriggerStateMap"
-	//
-	// );
-	// }
 
 	private ISet<String> getHZPausedTriggerGroups() {
 		return hazelcastClient.getSet(instanceName + '-' + "PausedTriggerGroupSet");
@@ -724,7 +716,7 @@ public class HazelcastJobStore implements JobStore {
 			throws JobPersistenceException {
 
 		List<OperableTrigger> result = new ArrayList<OperableTrigger>();
-		Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<JobKey>();
+		// Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<JobKey>();
 		Set<TriggerWrapper> excludedTriggers = new HashSet<TriggerWrapper>();
 		long firstAcquiredTriggerFireTime = 0;
 
@@ -817,8 +809,24 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void releaseAcquiredTrigger(OperableTrigger trigger) {
-		// TODO Auto-generated method stub
+		final IMap<TriggerKey, TriggerWrapper> triggerByKeyMap = getTriggerByKeyMap();
 
+		TriggerKey triggerKey = trigger.getKey();
+		lock(triggerKey);
+		try {
+			storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
+		} finally {
+			unlock(triggerKey);
+		}
+
+	}
+
+	private void lock(final TriggerKey triggerKey) {
+		getTriggerByKeyMap().lock(triggerKey);
+	}
+
+	private void unlock(final TriggerKey triggerKey) {
+		getTriggerByKeyMap().unlock(triggerKey);
 	}
 
 	public List<TriggerFiredResult> triggersFired(List<OperableTrigger> triggers) throws JobPersistenceException {
