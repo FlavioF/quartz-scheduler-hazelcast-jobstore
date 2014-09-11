@@ -5,6 +5,7 @@ import static com.google.common.collect.Sets.newHashSet;
 import static org.ameausoone.TriggerState.ACQUIRED;
 import static org.ameausoone.TriggerState.NORMAL;
 import static org.ameausoone.TriggerState.PAUSED;
+import static org.ameausoone.TriggerState.STATE_COMPLETED;
 import static org.ameausoone.TriggerState.WAITING;
 import static org.ameausoone.TriggerState.toClassicTriggerState;
 import static org.ameausoone.TriggerWrapper.newTriggerWrapper;
@@ -12,6 +13,7 @@ import static org.ameausoone.TriggerWrapper.newTriggerWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -20,6 +22,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Calendar;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
@@ -71,6 +75,8 @@ public class HazelcastJobStore implements JobStore {
 	private HazelcastInstance hazelcastClient;
 
 	protected String instanceId;
+
+	public static final DateTimeFormatter FORMATTER = ISODateTimeFormat.basicDateTimeNoMillis();
 
 	public String getInstanceId() {
 		return instanceId;
@@ -726,9 +732,14 @@ public class HazelcastJobStore implements JobStore {
 		if (noLaterThanWithTimeWindow < noEarlierThan)
 			return Lists.newArrayList();
 
-		Collection<TriggerWrapper> timeTriggers = triggerByKeyMap.values(new SqlPredicate("nextFireTime between "
-				+ noEarlierThan + " and " + noLaterThanWithTimeWindow + " and state != ACQUIRED"));
+		String sqlPredicate = "nextFireTime between " + noEarlierThan + " and " + noLaterThanWithTimeWindow
+				+ " and state != ACQUIRED";
 
+		Collection<TriggerWrapper> timeTriggers = triggerByKeyMap.values(new SqlPredicate(sqlPredicate));
+		sqlPredicate = "nextFireTime between " + FORMATTER.print(noEarlierThan) + " and "
+				+ FORMATTER.print(noLaterThanWithTimeWindow) + " and state != ACQUIRED";
+		log.debug("sqlPredicate : [{}]", sqlPredicate);
+		log.debug("timeTriggers : [{}]", timeTriggers);
 		Iterator<TriggerWrapper> iterator = timeTriggers.iterator();
 		while (true) {
 			TriggerWrapper tw;
@@ -745,17 +756,17 @@ public class HazelcastJobStore implements JobStore {
 				continue;
 			}
 
-			// if (applyMisfire(tw)) {
-			// if (tw.trigger.getNextFireTime() != null) {
-			// timeTriggers.add(tw);
-			// }
-			// continue;
-			// }
+			if (applyMisfire(tw)) {
+				if (tw.trigger.getNextFireTime() != null) {
+					storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
+				}
+				continue;
+			}
 
-			// if (tw.getTrigger().getNextFireTime().getTime() > noLaterThan + timeWindow) {
-			// timeTriggers.add(tw);
-			// break;
-			// }
+			if (tw.getTrigger().getNextFireTime().getTime() > noLaterThan + timeWindow) {
+				storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
+				break;
+			}
 
 			// TODO implement job with DisallowConcurrentExecution
 
@@ -789,6 +800,38 @@ public class HazelcastJobStore implements JobStore {
 		if (excludedTriggers.size() > 0)
 			timeTriggers.addAll(excludedTriggers);
 		return result;
+	}
+
+	protected boolean applyMisfire(TriggerWrapper tw) throws JobPersistenceException {
+
+		long misfireTime = System.currentTimeMillis();
+		if (getMisfireThreshold() > 0) {
+			misfireTime -= getMisfireThreshold();
+		}
+
+		Date tnft = tw.trigger.getNextFireTime();
+		if (tnft == null || tnft.getTime() > misfireTime
+				|| tw.trigger.getMisfireInstruction() == Trigger.MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY) {
+			return false;
+		}
+
+		Calendar cal = null;
+		if (tw.trigger.getCalendarName() != null) {
+			cal = retrieveCalendar(tw.trigger.getCalendarName());
+		}
+
+		this.schedSignaler.notifyTriggerListenersMisfired((OperableTrigger) tw.trigger.clone());
+
+		tw.trigger.updateAfterMisfire(cal);
+
+		if (tw.trigger.getNextFireTime() == null) {
+			storeTriggerWrapper(newTriggerWrapper(tw, STATE_COMPLETED));
+			schedSignaler.notifySchedulerListenersFinalized(tw.trigger);
+		} else if (tnft.equals(tw.trigger.getNextFireTime())) {
+			return false;
+		}
+
+		return true;
 	}
 
 	protected long getMisfireTime() {

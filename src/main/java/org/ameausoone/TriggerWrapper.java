@@ -83,6 +83,8 @@ class TriggerWrapper implements Serializable {
 				.add("jobKey", jobKey) //
 				.add("state", getState()) //
 				.add("nextFireTime", getNextFireTime()) //
+
+				.add("nextFireTime-iso", HazelcastJobStore.FORMATTER.print(getNextFireTime())) //
 				.toString();
 	}
 

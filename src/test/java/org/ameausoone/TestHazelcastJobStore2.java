@@ -173,6 +173,7 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 						1, 1L).get(0));
 	}
 
+	@SuppressWarnings("deprecation")
 	@Test
 	public void testAcquireNextTriggerBatch() throws Exception {
 
@@ -184,6 +185,7 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 
 		OperableTrigger early = new SimpleTriggerImpl("early", "triggerGroup1", fJobDetail.getName(),
 				fJobDetail.getGroup(), new Date(baseFireTime), new Date(baseFireTime + 5), 2, 2000);
+
 		OperableTrigger trigger1 = new SimpleTriggerImpl("trigger1", "triggerGroup1", fJobDetail.getName(),
 				fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200005), 2, 2000);
 		OperableTrigger trigger2 = new SimpleTriggerImpl("trigger2", "triggerGroup1", fJobDetail.getName(),
@@ -214,10 +216,10 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 		List<OperableTrigger> acquiredTriggers = hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 4, 1000L);
 		log.debug("acquiredTriggers : [{}]", acquiredTriggers);
 		assertEquals(4, acquiredTriggers.size());
-		assertEquals(early.getKey(), acquiredTriggers.get(0).getKey());
-		assertEquals(trigger1.getKey(), acquiredTriggers.get(1).getKey());
-		assertEquals(trigger2.getKey(), acquiredTriggers.get(2).getKey());
-		assertEquals(trigger3.getKey(), acquiredTriggers.get(3).getKey());
+		assertEquals(acquiredTriggers.get(0).getKey(), early.getKey());
+		assertEquals(acquiredTriggers.get(1).getKey(), trigger1.getKey());
+		assertEquals(acquiredTriggers.get(2).getKey(), trigger2.getKey());
+		assertEquals(acquiredTriggers.get(3).getKey(), trigger3.getKey());
 		hazelcastJobStore.releaseAcquiredTrigger(early);
 		hazelcastJobStore.releaseAcquiredTrigger(trigger1);
 		hazelcastJobStore.releaseAcquiredTrigger(trigger2);

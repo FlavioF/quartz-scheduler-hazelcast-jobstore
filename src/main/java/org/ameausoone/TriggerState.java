@@ -1,7 +1,7 @@
 package org.ameausoone;
 
 public enum TriggerState {
-	NONE, NORMAL, PAUSED, COMPLETE, ERROR, BLOCKED, ACQUIRED, WAITING;
+	NONE, NORMAL, PAUSED, COMPLETE, ERROR, BLOCKED, ACQUIRED, WAITING, STATE_COMPLETED;
 
 	public static org.quartz.Trigger.TriggerState toClassicTriggerState(TriggerState state) {
 		switch (state) {
@@ -16,6 +16,7 @@ public enum TriggerState {
 		case NORMAL:
 		case ACQUIRED:
 		case WAITING:
+		case STATE_COMPLETED:
 			return org.quartz.Trigger.TriggerState.NORMAL;
 		default:
 			return org.quartz.Trigger.TriggerState.NORMAL;
