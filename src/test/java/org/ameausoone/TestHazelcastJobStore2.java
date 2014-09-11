@@ -4,6 +4,9 @@ import static org.fest.assertions.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 
 import java.util.Date;
+import java.util.List;
+
+import lombok.extern.slf4j.Slf4j;
 
 import org.quartz.DateBuilder;
 import org.quartz.JobBuilder;
@@ -12,6 +15,7 @@ import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
+import org.quartz.Trigger.TriggerState;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
 import org.quartz.impl.JobDetailImpl;
@@ -22,6 +26,7 @@ import org.quartz.spi.OperableTrigger;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+@Slf4j
 public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 
 	@Test
@@ -166,5 +171,221 @@ public class TestHazelcastJobStore2 extends AbstractTestHazelcastJobStore {
 				trigger3,
 				hazelcastJobStore.acquireNextTriggers(new Date(trigger1.getNextFireTime().getTime()).getTime() + 10000,
 						1, 1L).get(0));
+	}
+
+	@Test
+	public void testAcquireNextTriggerBatch() throws Exception {
+
+		Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
+		long baseFireTime = baseFireTimeDate.getTime();
+		JobDetailImpl fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
+		fJobDetail.setDurability(true);
+		hazelcastJobStore.storeJob(fJobDetail, false);
+
+		OperableTrigger early = new SimpleTriggerImpl("early", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime), new Date(baseFireTime + 5), 2, 2000);
+		OperableTrigger trigger1 = new SimpleTriggerImpl("trigger1", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 200000), new Date(baseFireTime + 200005), 2, 2000);
+		OperableTrigger trigger2 = new SimpleTriggerImpl("trigger2", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 200100), new Date(baseFireTime + 200105), 2, 2000);
+		OperableTrigger trigger3 = new SimpleTriggerImpl("trigger3", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 200200), new Date(baseFireTime + 200205), 2, 2000);
+		OperableTrigger trigger4 = new SimpleTriggerImpl("trigger4", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 200300), new Date(baseFireTime + 200305), 2, 2000);
+
+		OperableTrigger trigger10 = new SimpleTriggerImpl("trigger10", "triggerGroup2", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(baseFireTime + 500000), new Date(baseFireTime + 700000), 2, 2000);
+
+		early.computeFirstFireTime(null);
+		trigger1.computeFirstFireTime(null);
+		trigger2.computeFirstFireTime(null);
+		trigger3.computeFirstFireTime(null);
+		trigger4.computeFirstFireTime(null);
+		trigger10.computeFirstFireTime(null);
+		hazelcastJobStore.storeTrigger(early, false);
+		hazelcastJobStore.storeTrigger(trigger1, false);
+		hazelcastJobStore.storeTrigger(trigger2, false);
+		hazelcastJobStore.storeTrigger(trigger3, false);
+		hazelcastJobStore.storeTrigger(trigger4, false);
+		hazelcastJobStore.storeTrigger(trigger10, false);
+
+		long firstFireTime = new Date(trigger1.getNextFireTime().getTime()).getTime();
+
+		List<OperableTrigger> acquiredTriggers = hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 4, 1000L);
+		log.debug("acquiredTriggers : [{}]", acquiredTriggers);
+		assertEquals(4, acquiredTriggers.size());
+		assertEquals(early.getKey(), acquiredTriggers.get(0).getKey());
+		assertEquals(trigger1.getKey(), acquiredTriggers.get(1).getKey());
+		assertEquals(trigger2.getKey(), acquiredTriggers.get(2).getKey());
+		assertEquals(trigger3.getKey(), acquiredTriggers.get(3).getKey());
+		hazelcastJobStore.releaseAcquiredTrigger(early);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger1);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger2);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger3);
+
+		acquiredTriggers = hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 5, 1000L);
+		assertEquals(5, acquiredTriggers.size());
+		assertEquals(early.getKey(), acquiredTriggers.get(0).getKey());
+		assertEquals(trigger1.getKey(), acquiredTriggers.get(1).getKey());
+		assertEquals(trigger2.getKey(), acquiredTriggers.get(2).getKey());
+		assertEquals(trigger3.getKey(), acquiredTriggers.get(3).getKey());
+		assertEquals(trigger4.getKey(), acquiredTriggers.get(4).getKey());
+		hazelcastJobStore.releaseAcquiredTrigger(early);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger1);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger2);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger3);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger4);
+
+		acquiredTriggers = hazelcastJobStore.acquireNextTriggers(firstFireTime + 10000, 6, 1000L);
+		assertEquals(5, acquiredTriggers.size());
+		assertEquals(early.getKey(), acquiredTriggers.get(0).getKey());
+		assertEquals(trigger1.getKey(), acquiredTriggers.get(1).getKey());
+		assertEquals(trigger2.getKey(), acquiredTriggers.get(2).getKey());
+		assertEquals(trigger3.getKey(), acquiredTriggers.get(3).getKey());
+		assertEquals(trigger4.getKey(), acquiredTriggers.get(4).getKey());
+		hazelcastJobStore.releaseAcquiredTrigger(early);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger1);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger2);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger3);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger4);
+
+		acquiredTriggers = hazelcastJobStore.acquireNextTriggers(firstFireTime + 1, 5, 0L);
+		assertEquals(2, acquiredTriggers.size());
+		assertEquals(early.getKey(), acquiredTriggers.get(0).getKey());
+		assertEquals(trigger1.getKey(), acquiredTriggers.get(1).getKey());
+		hazelcastJobStore.releaseAcquiredTrigger(early);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger1);
+
+		acquiredTriggers = hazelcastJobStore.acquireNextTriggers(firstFireTime + 250, 5, 199L);
+		assertEquals(5, acquiredTriggers.size());
+		assertEquals(early.getKey(), acquiredTriggers.get(0).getKey());
+		assertEquals(trigger1.getKey(), acquiredTriggers.get(1).getKey());
+		assertEquals(trigger2.getKey(), acquiredTriggers.get(2).getKey());
+		assertEquals(trigger3.getKey(), acquiredTriggers.get(3).getKey());
+		assertEquals(trigger4.getKey(), acquiredTriggers.get(4).getKey());
+		hazelcastJobStore.releaseAcquiredTrigger(early);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger1);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger2);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger3);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger4);
+
+		acquiredTriggers = hazelcastJobStore.acquireNextTriggers(firstFireTime + 150, 5, 50L);
+		assertEquals(4, acquiredTriggers.size());
+		assertEquals(early.getKey(), acquiredTriggers.get(0).getKey());
+		assertEquals(trigger1.getKey(), acquiredTriggers.get(1).getKey());
+		assertEquals(trigger2.getKey(), acquiredTriggers.get(2).getKey());
+		assertEquals(trigger3.getKey(), acquiredTriggers.get(3).getKey());
+		hazelcastJobStore.releaseAcquiredTrigger(early);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger1);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger2);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger3);
+	}
+
+	@Test
+	public void testTriggerStates() throws Exception {
+		JobDetailImpl fJobDetail = new JobDetailImpl("job1", "jobGroup1", MyJob.class);
+		fJobDetail.setDurability(true);
+		hazelcastJobStore.storeJob(fJobDetail, false);
+
+		OperableTrigger trigger = new SimpleTriggerImpl("trigger1", "triggerGroup1", fJobDetail.getName(),
+				fJobDetail.getGroup(), new Date(System.currentTimeMillis() + 100000), new Date(
+						System.currentTimeMillis() + 200000), 2, 2000);
+		trigger.computeFirstFireTime(null);
+		assertEquals(TriggerState.NONE, hazelcastJobStore.getTriggerState(trigger.getKey()));
+		hazelcastJobStore.storeTrigger(trigger, false);
+		assertEquals(TriggerState.NORMAL, hazelcastJobStore.getTriggerState(trigger.getKey()));
+
+		hazelcastJobStore.pauseTrigger(trigger.getKey());
+		assertEquals(TriggerState.PAUSED, hazelcastJobStore.getTriggerState(trigger.getKey()));
+
+		hazelcastJobStore.resumeTrigger(trigger.getKey());
+		assertEquals(TriggerState.NORMAL, hazelcastJobStore.getTriggerState(trigger.getKey()));
+
+		trigger = hazelcastJobStore.acquireNextTriggers(
+				new Date(trigger.getNextFireTime().getTime()).getTime() + 10000, 1, 1L).get(0);
+		Assert.assertNotNull(trigger);
+		hazelcastJobStore.releaseAcquiredTrigger(trigger);
+		trigger = hazelcastJobStore.acquireNextTriggers(
+				new Date(trigger.getNextFireTime().getTime()).getTime() + 10000, 1, 1L).get(0);
+		Assert.assertNotNull(trigger);
+		Assert.assertTrue(hazelcastJobStore.acquireNextTriggers(
+				new Date(trigger.getNextFireTime().getTime()).getTime() + 10000, 1, 1L).isEmpty());
+	}
+
+	public void testAcquireTriggers() throws Exception {
+		// SchedulerSignaler schedSignaler = new SampleSignaler();
+		// ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
+		// loadHelper.initialize();
+		//
+		// // JobStore store = createJobStore("testAcquireTriggers");
+		// hazelcastJobStore.initialize(loadHelper, schedSignaler);
+
+		// Setup: Store jobs and triggers.
+		long MIN = 60 * 1000L;
+		Date startTime0 = new Date(System.currentTimeMillis() + MIN); // a min from now.
+		for (int i = 0; i < 10; i++) {
+			Date startTime = new Date(startTime0.getTime() + i * MIN); // a min apart
+			JobDetail job = JobBuilder.newJob(MyJob.class).withIdentity("job" + i).build();
+			SimpleScheduleBuilder schedule = SimpleScheduleBuilder.repeatMinutelyForever(2);
+			OperableTrigger trigger = (OperableTrigger) TriggerBuilder.newTrigger().withIdentity("job" + i)
+					.withSchedule(schedule).forJob(job).startAt(startTime).build();
+
+			// Manually trigger the first fire time computation that scheduler would do. Otherwise
+			// the hazelcastJobStore.acquireNextTriggers() will not work properly.
+			Date fireTime = trigger.computeFirstFireTime(null);
+			Assert.assertEquals(true, fireTime != null);
+
+			hazelcastJobStore.storeJobAndTrigger(job, trigger);
+		}
+
+		// Test acquire one trigger at a time
+		for (int i = 0; i < 10; i++) {
+			long noLaterThan = (startTime0.getTime() + i * MIN);
+			int maxCount = 1;
+			long timeWindow = 0;
+			List<OperableTrigger> triggers = hazelcastJobStore.acquireNextTriggers(noLaterThan, maxCount, timeWindow);
+			Assert.assertEquals(1, triggers.size());
+			Assert.assertEquals("job" + i, triggers.get(0).getKey().getName());
+
+			// Let's remove the trigger now.
+			hazelcastJobStore.removeJob(triggers.get(0).getJobKey());
+		}
+	}
+
+	public void testAcquireTriggersInBatch() throws Exception {
+		// SchedulerSignaler schedSignaler = new SampleSignaler();
+		// ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
+		// loadHelper.initialize();
+		//
+		// hazelcastJobStore.initialize(loadHelper, schedSignaler);
+
+		// Setup: Store jobs and triggers.
+		long MIN = 60 * 1000L;
+		Date startTime0 = new Date(System.currentTimeMillis() + MIN); // a min from now.
+		for (int i = 0; i < 10; i++) {
+			Date startTime = new Date(startTime0.getTime() + i * MIN); // a min apart
+			JobDetail job = JobBuilder.newJob(MyJob.class).withIdentity("job" + i).build();
+			SimpleScheduleBuilder schedule = SimpleScheduleBuilder.repeatMinutelyForever(2);
+			OperableTrigger trigger = (OperableTrigger) TriggerBuilder.newTrigger().withIdentity("job" + i)
+					.withSchedule(schedule).forJob(job).startAt(startTime).build();
+
+			// Manually trigger the first fire time computation that scheduler would do. Otherwise
+			// the store.acquireNextTriggers() will not work properly.
+			Date fireTime = trigger.computeFirstFireTime(null);
+			Assert.assertEquals(true, fireTime != null);
+
+			hazelcastJobStore.storeJobAndTrigger(job, trigger);
+		}
+
+		// Test acquire batch of triggers at a time
+		long noLaterThan = startTime0.getTime() + 10 * MIN;
+		int maxCount = 7;
+		// time window needs to be big to be able to pick up multiple triggers when they are a minute apart
+		long timeWindow = 8 * MIN;
+		List<OperableTrigger> triggers = hazelcastJobStore.acquireNextTriggers(noLaterThan, maxCount, timeWindow);
+		Assert.assertEquals(7, triggers.size());
+		for (int i = 0; i < 7; i++) {
+			Assert.assertEquals("job" + i, triggers.get(i).getKey().getName());
+		}
 	}
 }

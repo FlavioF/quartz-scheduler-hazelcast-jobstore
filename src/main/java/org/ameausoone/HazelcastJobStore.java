@@ -729,9 +729,6 @@ public class HazelcastJobStore implements JobStore {
 		Collection<TriggerWrapper> timeTriggers = triggerByKeyMap.values(new SqlPredicate("nextFireTime between "
 				+ noEarlierThan + " and " + noLaterThanWithTimeWindow + " and state != ACQUIRED"));
 
-		// return empty list if store has no triggers.
-		// if (timeTriggers.size() == 0)
-		// return result;
 		Iterator<TriggerWrapper> iterator = timeTriggers.iterator();
 		while (true) {
 			TriggerWrapper tw;
@@ -740,7 +737,6 @@ public class HazelcastJobStore implements JobStore {
 				tw = iterator.next();
 				if (tw == null)
 					break;
-				// timeTriggers.remove(tw);
 			} catch (java.util.NoSuchElementException nsee) {
 				break;
 			}
@@ -760,6 +756,8 @@ public class HazelcastJobStore implements JobStore {
 			// timeTriggers.add(tw);
 			// break;
 			// }
+
+			// TODO implement job with DisallowConcurrentExecution
 
 			// If trigger's job is set as @DisallowConcurrentExecution, and it has already been added to result,
 			// then
@@ -809,8 +807,6 @@ public class HazelcastJobStore implements JobStore {
 	}
 
 	public void releaseAcquiredTrigger(OperableTrigger trigger) {
-		final IMap<TriggerKey, TriggerWrapper> triggerByKeyMap = getTriggerByKeyMap();
-
 		TriggerKey triggerKey = trigger.getKey();
 		lock(triggerKey);
 		try {
