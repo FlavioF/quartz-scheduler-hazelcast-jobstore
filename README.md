@@ -1,2 +1,43 @@
-Implementation of Quartz job store using Hazelcast 
-=========
+Quartz-Scheduler Hazelcast Job Store
+====================================
+An implementation of a Quartz Scheduler JobStore using Hazelcast distributed Maps and Sets.
+
+This implementation is based on [Ameausoone/quartz-hazelcast-jobstore](https://github.com/Ameausoone/quartz-hazelcast-jobstore).
+
+## About Quartz
+Quartz is a richly featured, open source job scheduling library that can be integrated within virtually any Java application - from the smallest stand-alone application to the largest e-commerce system. Quartz can be used to create simple or complex schedules for executing tens, hundreds, or even tens-of-thousands of jobs; jobs whose tasks are defined as standard Java components that may execute virtually anything you may program them to do. The Quartz Scheduler includes many enterprise-class features, such as support for JTA transactions and clustering.
+
+##### Job Stores in Quartz
+JobStore's are responsible for keeping track of all the "work data" that you give to the scheduler: jobs, triggers, calendars, etc. Selecting the appropriate JobStore for your Quartz scheduler instance is an important step. Luckily, the choice should be a very easy one once you understand the differences between them. You declare which JobStore your scheduler should use (and it's configuration settings) in the properties file (or object) that you provide to the SchedulerFactory that you use to produce your scheduler instance.
+
+[Read More](http://quartz-scheduler.org/documentation/quartz-2.x/tutorials/tutorial-lesson-09)
+
+## About Hazelcast
+Hazelcast is an in-memory open source software data grid based on Java. By having multiple nodes form a cluster, data is evenly distributed among the nodes. This allows for horizontal scaling both in terms of available storage space and processing power. Backups are also distributed in a similar fashion to other nodes, based on configuration, thereby protecting against single node failure.
+Note that you can use Hazelcast MapStores to store all the data in your in-memory Maps in a datastore like Cassandra or Elasticsearch (synchronously or asynchronously). Learn more about it [here](http://docs.hazelcast.org/docs/3.4/manual/html/map-persistence.html).
+
+[Read More](http://hazelcast.org/)
+
+# Testing it
+#### Pre-requisites
+
+* JDK 8 or newer
+* Maven 3.1.0 or newer
+
+#### Clone
+```
+git clone https://github.com/FlavioF/quartz-scheduler-hazelcast-jobstore.git
+cd quartz-scheduler-hazelcast-jobstore
+```
+#### Build
+```
+mvn clean install
+```
+
+### Configuring HazelcastJobStore
+```
+Properties props = new Properties();
+props.setProperty(StdSchedulerFactory.PROP_JOB_STORE_CLASS, HazelcastJobStore.class.getName());
+
+StdSchedulerFactory scheduler = new StdSchedulerFactory(props).getScheduler();
+```
