@@ -1,9 +1,8 @@
-package org.ameausoone;
+package com.flaviof.quart.jobstore.hazelcast;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
-import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
 import org.quartz.JobBuilder;
 import org.quartz.JobDetail;
@@ -24,12 +23,16 @@ import org.quartz.spi.ClassLoadHelper;
 import org.quartz.spi.JobStore;
 import org.quartz.spi.OperableTrigger;
 import org.quartz.spi.SchedulerSignaler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 
-@Slf4j
 public abstract class AbstractTestHazelcastJobStore {
+  
+    static final Logger log = LoggerFactory.getLogger(AbstractTestHazelcastJobStore.class);
+
 
   private HazelcastInstance hazelcastInstance;
   protected JobStore jobStore;

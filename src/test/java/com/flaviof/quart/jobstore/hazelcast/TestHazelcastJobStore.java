@@ -1,4 +1,4 @@
-package org.ameausoone;
+package com.flaviof.quart.jobstore.hazelcast;
 
 import com.beust.jcommander.internal.Maps;
 import com.google.common.collect.Lists;
@@ -7,9 +7,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
-import org.fest.assertions.Assertions;
-import static org.fest.assertions.Assertions.assertThat;
 import org.quartz.Calendar;
 import org.quartz.DateBuilder;
 import org.quartz.JobBuilder;
@@ -35,13 +32,14 @@ import org.quartz.spi.OperableTrigger;
 import org.quartz.spi.SchedulerSignaler;
 import org.testng.Assert;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 import org.testng.annotations.Test;
 import org.testng.internal.annotations.Sets;
 
-@Slf4j
 public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test()
@@ -204,6 +202,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test()
   public void testTriggerStates() throws Exception {
+
     this.jobStore.storeJob(fJobDetail, false);
 
     final OperableTrigger trigger = new SimpleTriggerImpl("trigger1",
@@ -275,6 +274,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test()
   public void testPauseJobGroupPausesNewJob() throws Exception {
+
     // Pausing job groups in JDBCJobStore is broken, see QTZ-208
     if (jobStore instanceof JobStoreSupport)
       return;
@@ -303,6 +303,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test()
   public void testStoreAndRetrieveJobs() throws Exception {
+
     SchedulerSignaler schedSignaler = new SampleSignaler();
     ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
     loadHelper.initialize();
@@ -326,6 +327,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test()
   public void testStoreAndRetriveTriggers() throws Exception {
+
     SchedulerSignaler schedSignaler = new SampleSignaler();
     ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
     loadHelper.initialize();
@@ -357,6 +359,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test()
   public void testAcquireTriggers() throws Exception {
+
     SchedulerSignaler schedSignaler = new SampleSignaler();
     ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
     loadHelper.initialize();
@@ -404,6 +407,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test()
   public void testAcquireTriggersInBatch() throws Exception {
+
     SchedulerSignaler schedSignaler = new SampleSignaler();
     ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
     loadHelper.initialize();
@@ -448,15 +452,17 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
   @Test
   public void testStoreSimpleJob() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     String jobName = "job20";
     storeJob(jobName);
     JobDetail retrieveJob = retrieveJob(jobName);
-    assertThat(retrieveJob).isNotNull();
+    assertNotNull(retrieveJob);
   }
 
   @Test(expectedExceptions = { ObjectAlreadyExistsException.class })
   public void storeTwiceSameJob() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     String jobName = "job21";
     storeJob(jobName);
     storeJob(jobName);
@@ -465,30 +471,32 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
   @Test
   public void testRemoveJob() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     String jobName = "job22";
     JobDetail jobDetail = buildJob(jobName);
     storeJob(jobDetail);
     JobDetail retrieveJob = retrieveJob(jobName);
-    assertThat(retrieveJob).isNotNull();
+    assertNotNull(retrieveJob);
     Trigger trigger = buildTrigger(jobDetail);
     storeTrigger(trigger);
 
-    assertThat(retrieveTrigger(trigger.getKey())).isNotNull();
+    assertNotNull(retrieveTrigger(trigger.getKey()));
 
     boolean removeJob = this.jobStore.removeJob(jobDetail.getKey());
-    assertThat(removeJob).isTrue();
+    assertTrue(removeJob);
     retrieveJob = retrieveJob(jobName);
-    assertThat(retrieveJob).isNull();
+    assertNull(retrieveJob);
 
-    assertThat(retrieveTrigger(trigger.getKey())).isNull();
+    assertNull(retrieveTrigger(trigger.getKey()));
 
     removeJob = this.jobStore.removeJob(jobDetail.getKey());
-    assertThat(removeJob).isFalse();
+    assertFalse(removeJob);
   }
 
   @Test
   public void testRemoveJobs() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     String jobName = "job24";
     JobDetail jobDetail = buildJob(jobName);
     String jobName2 = "job25";
@@ -496,54 +504,58 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
     this.jobStore.storeJob(jobDetail, false);
     this.jobStore.storeJob(jobDetailImpl2, false);
     JobDetail retrieveJob = retrieveJob(jobName);
-    assertThat(retrieveJob).isNotNull();
+    assertNotNull(retrieveJob);
     List<JobKey> jobKeyList = Lists.newArrayList(jobDetail.getKey(),
         jobDetailImpl2.getKey());
     boolean removeJob = this.jobStore.removeJobs(jobKeyList);
-    assertThat(removeJob).isTrue();
+    assertTrue(removeJob);
     retrieveJob = retrieveJob(jobName);
-    assertThat(retrieveJob).isNull();
+    assertNull(retrieveJob);
     retrieveJob = retrieveJob(jobName2);
-    assertThat(retrieveJob).isNull();
+    assertNull(retrieveJob);
     removeJob = this.jobStore.removeJob(jobDetail.getKey());
-    assertThat(removeJob).isFalse();
+    assertFalse(removeJob);
     removeJob = this.jobStore.removeJob(jobDetailImpl2.getKey());
-    assertThat(removeJob).isFalse();
+    assertFalse(removeJob);
   }
 
   @Test
   public void testCheckExistsJob() throws JobPersistenceException {
+
     JobDetail jobDetailImpl = buildJob("job23");
     this.jobStore.storeJob(jobDetailImpl, false);
     boolean checkExists = jobStore.checkExists(jobDetailImpl.getKey());
-    Assertions.assertThat(checkExists).isTrue();
+    assertTrue(checkExists);
   }
 
   @Test(expectedExceptions = { JobPersistenceException.class })
   public void testStoreTriggerWithoutJob() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger1 = buildTrigger("trigger", "group");
     storeTrigger(trigger1);
     Trigger retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
   }
 
   @Test
   public void testStoreTrigger() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger1 = buildTrigger();
     storeTrigger(trigger1);
     Trigger retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
   }
 
   @Test(expectedExceptions = { ObjectAlreadyExistsException.class })
   public void testStoreTriggerThrowsAlreadyExists()
       throws ObjectAlreadyExistsException, JobPersistenceException {
+
     Trigger trigger1 = buildTrigger();
     storeTrigger(trigger1);
     Trigger retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
     storeTrigger(trigger1);
     retrieveTrigger = retrieveTrigger(trigger1.getKey());
   }
@@ -551,39 +563,42 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
   @Test
   public void testStoreTriggerTwice() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger1 = buildTrigger();
 
     storeTrigger(trigger1);
     Trigger retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
     jobStore.storeTrigger((OperableTrigger) trigger1, true);
     retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
   }
 
   @Test
   public void testRemoveTrigger() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail storeJob = storeJob(buildJob("job"));
     Trigger trigger1 = buildTrigger(storeJob);
     TriggerKey triggerKey = trigger1.getKey();
     storeTrigger(trigger1);
     Trigger retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
     boolean removeTrigger = jobStore.removeTrigger(triggerKey);
-    assertThat(removeTrigger).isTrue();
+    assertTrue(removeTrigger);
     retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNull();
+    assertNull(retrieveTrigger);
     removeTrigger = jobStore.removeTrigger(triggerKey);
-    assertThat(removeTrigger).isFalse();
+    assertFalse(removeTrigger);
 
     TriggerState triggerState = jobStore.getTriggerState(triggerKey);
-    assertThat(triggerState).isEqualTo(TriggerState.NONE);
+    assertEquals(triggerState, TriggerState.NONE);
   }
 
   @Test
   public void testRemoveTriggers() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger1 = buildTrigger();
     Trigger trigger2 = buildTrigger();
 
@@ -593,27 +608,29 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
     List<TriggerKey> triggerKeys = Lists.newArrayList(trigger1.getKey(),
         trigger2.getKey());
     boolean removeTriggers = jobStore.removeTriggers(triggerKeys);
-    assertThat(removeTriggers).isTrue();
+    assertTrue(removeTriggers);
   }
 
   @Test
   public void testTriggerCheckExists() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger1 = buildTrigger();
     TriggerKey triggerKey = trigger1.getKey();
 
     boolean checkExists = jobStore.checkExists(triggerKey);
-    assertThat(checkExists).isFalse();
+    assertFalse(checkExists);
 
     storeTrigger(trigger1);
 
     checkExists = jobStore.checkExists(triggerKey);
-    assertThat(checkExists).isTrue();
+    assertTrue(checkExists);
   }
 
   @Test
   public void testReplaceTrigger() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger1 = buildTrigger();
 
     storeTrigger(trigger1);
@@ -623,34 +640,36 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
     TriggerKey triggerKey = trigger1.getKey();
     boolean replaceTrigger = jobStore.replaceTrigger(triggerKey,
         (OperableTrigger) newTrigger);
-    assertThat(replaceTrigger).isTrue();
+    assertTrue(replaceTrigger);
     Trigger retrieveTrigger = jobStore.retrieveTrigger(triggerKey);
-    assertThat(retrieveTrigger).isEqualTo(newTrigger);
+    assertEquals(retrieveTrigger, newTrigger);
   }
 
   @Test
   public void testStoreJobAndTrigger() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail jobDetailImpl = buildJob("job30");
 
     Trigger trigger1 = buildTrigger();
     jobStore.storeJobAndTrigger(jobDetailImpl, (OperableTrigger) trigger1);
     JobDetail retrieveJob = jobStore.retrieveJob(jobDetailImpl.getKey());
-    assertThat(retrieveJob).isNotNull();
+    assertNotNull(retrieveJob);
     Trigger retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
   }
 
   @Test(expectedExceptions = { ObjectAlreadyExistsException.class })
   public void testStoreJobAndTriggerThrowJobAlreadyExists()
       throws ObjectAlreadyExistsException, JobPersistenceException {
+
     JobDetail jobDetailImpl = buildJob("job31");
     Trigger trigger1 = buildTrigger();
     jobStore.storeJobAndTrigger(jobDetailImpl, (OperableTrigger) trigger1);
     JobDetail retrieveJob = jobStore.retrieveJob(jobDetailImpl.getKey());
-    assertThat(retrieveJob).isNotNull();
+    assertNotNull(retrieveJob);
     Trigger retrieveTrigger = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger).isNotNull();
+    assertNotNull(retrieveTrigger);
 
     jobStore.storeJobAndTrigger(jobDetailImpl, (OperableTrigger) trigger1);
   }
@@ -658,58 +677,62 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
   @Test
   public void storeCalendar() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     String calName = "calendar";
     storeCalendar(calName);
     Calendar retrieveCalendar = jobStore.retrieveCalendar(calName);
-    assertThat(retrieveCalendar).isNotNull();
+    assertNotNull(retrieveCalendar);
   }
 
   @Test
   public void testRemoveCalendar() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     String calName = "calendar1";
     storeCalendar(calName);
 
     Calendar retrieveCalendar = jobStore.retrieveCalendar(calName);
-    assertThat(retrieveCalendar).isNotNull();
+    assertNotNull(retrieveCalendar);
     boolean calendarExisted = jobStore.removeCalendar(calName);
-    assertThat(calendarExisted).isTrue();
+    assertTrue(calendarExisted);
     retrieveCalendar = jobStore.retrieveCalendar(calName);
-    assertThat(retrieveCalendar).isNull();
+    assertNull(retrieveCalendar);
     calendarExisted = jobStore.removeCalendar(calName);
-    assertThat(calendarExisted).isFalse();
+    assertFalse(calendarExisted);
 
   }
 
   @Test
   public void testClearAllSchedulingData() throws JobPersistenceException {
-    assertThat(jobStore.getNumberOfJobs()).isEqualTo(0);
 
-    assertThat(jobStore.getNumberOfTriggers()).isEqualTo(0);
+    assertEquals(jobStore.getNumberOfJobs(), 0);
 
-    assertThat(jobStore.getNumberOfCalendars()).isEqualTo(0);
+    assertEquals(jobStore.getNumberOfTriggers(), 0);
+
+    assertEquals(jobStore.getNumberOfCalendars(), 0);
 
     final String jobName = "job40";
     final JobDetail storeJob = storeJob(jobName);
-    assertThat(jobStore.getNumberOfJobs()).isEqualTo(1);
+    assertEquals(jobStore.getNumberOfJobs(), 1);
 
     jobStore.storeTrigger((OperableTrigger) buildTrigger(storeJob), false);
-    assertThat(jobStore.getNumberOfTriggers()).isEqualTo(1);
+    assertEquals(jobStore.getNumberOfTriggers(), 1);
 
     jobStore.storeCalendar("calendar", new BaseCalendar(), false, false);
-    assertThat(jobStore.getNumberOfCalendars()).isEqualTo(1);
+    assertEquals(jobStore.getNumberOfCalendars(), 1);
 
     jobStore.clearAllSchedulingData();
-    assertThat(jobStore.getNumberOfJobs()).isEqualTo(0);
+    assertEquals(jobStore.getNumberOfJobs(), 0);
 
-    assertThat(jobStore.getNumberOfTriggers()).isEqualTo(0);
+    assertEquals(jobStore.getNumberOfTriggers(), 0);
 
-    assertThat(jobStore.getNumberOfCalendars()).isEqualTo(0);
+    assertEquals(jobStore.getNumberOfCalendars(), 0);
   }
 
   @Test
   public void testStoreSameJobNameWithDifferentGroup()
       throws ObjectAlreadyExistsException, JobPersistenceException {
+
     storeJob(buildJob("job40", "group1"));
     storeJob(buildJob("job40", "group2"));
     // Assert there is no exception throws
@@ -718,56 +741,71 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
   @Test
   public void testGetJobGroupNames() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail buildJob = buildJob("job40", "group1");
     storeJob(buildJob);
     storeJob(buildJob("job41", "group2"));
     List<String> jobGroupNames = jobStore.getJobGroupNames();
-    assertThat(jobGroupNames).containsOnly("group1", "group2");
+    assertEquals(jobGroupNames.size(), 2);
+    assertTrue(jobGroupNames.contains("group1"));
+    assertTrue(jobGroupNames.contains("group2"));
 
     this.jobStore.removeJob(buildJob.getKey());
 
     jobGroupNames = jobStore.getJobGroupNames();
-    assertThat(jobGroupNames).containsOnly("group2");
+    assertEquals(jobGroupNames.size(), 1);
+    assertTrue(jobGroupNames.contains("group2"));
   }
 
   @Test
   public void testJobKeyByGroup() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail job1group1 = buildJob("job1", "group1");
     storeJob(job1group1);
     JobDetail job1group2 = buildJob("job1", "group2");
     storeJob(job1group2);
     storeJob(buildJob("job2", "group2"));
     List<String> jobGroupNames = jobStore.getJobGroupNames();
-    assertThat(jobGroupNames).containsOnly("group1", "group2");
+    assertEquals(jobGroupNames.size(), 2);
+    assertTrue(jobGroupNames.contains("group1"));
+    assertTrue(jobGroupNames.contains("group2"));
 
     this.jobStore.removeJob(job1group1.getKey());
 
     jobGroupNames = jobStore.getJobGroupNames();
-    assertThat(jobGroupNames).containsOnly("group2");
+    assertEquals(jobGroupNames.size(), 1);
+    assertTrue(jobGroupNames.contains("group2"));
 
     this.jobStore.removeJob(job1group2.getKey());
 
     jobGroupNames = jobStore.getJobGroupNames();
-    assertThat(jobGroupNames).containsOnly("group2");
+    assertEquals(jobGroupNames.size(), 1);
+    assertTrue(jobGroupNames.contains("group2"));
   }
 
   @Test
   public void testGetTriggerGroupNames() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail storeJob = storeJob(buildJob("job"));
     storeTrigger(buildTrigger("trigger1", "group1", storeJob));
     storeTrigger(buildTrigger("trigger2", "group2", storeJob));
     List<String> triggerGroupNames = jobStore.getTriggerGroupNames();
-    assertThat(triggerGroupNames).containsOnly("group1", "group2");
+    assertEquals(triggerGroupNames.size(), 2);
+    assertTrue(triggerGroupNames.contains("group1"));
+    assertTrue(triggerGroupNames.contains("group2"));
   }
 
   @Test
   public void testCalendarNames() throws JobPersistenceException {
+
     storeCalendar("cal1");
     storeCalendar("cal2");
     List<String> calendarNames = jobStore.getCalendarNames();
-    assertThat(calendarNames).containsOnly("cal1", "cal2");
+    assertEquals(calendarNames.size(), 2);
+    assertTrue(calendarNames.contains("cal1"));
+    assertTrue(calendarNames.contains("cal2"));
   }
 
   @Test
@@ -792,16 +830,16 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
     jobStore.storeJobsAndTriggers(triggersAndJobs, false);
 
     final JobDetail retrieveJob1 = retrieveJob(job1.getKey().getName());
-    assertThat(retrieveJob1).isNotNull();
+    assertNotNull(retrieveJob1);
 
     final JobDetail retrieveJob2 = retrieveJob(job2.getKey().getName());
-    assertThat(retrieveJob2).isNotNull();
+    assertNotNull(retrieveJob2);
 
     final Trigger retrieveTrigger1 = retrieveTrigger(trigger1.getKey());
-    assertThat(retrieveTrigger1).isNotNull();
+    assertNotNull(retrieveTrigger1);
 
     final Trigger retrieveTrigger2 = retrieveTrigger(trigger2.getKey());
-    assertThat(retrieveTrigger2).isNotNull();
+    assertNotNull(retrieveTrigger2);
   }
 
   @Test(expectedExceptions = { ObjectAlreadyExistsException.class })
@@ -820,6 +858,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
   @Test
   public void testGetTriggersForJob() throws JobPersistenceException {
+
     JobDetail jobDetail = buildAndStoreJob();
     Trigger trigger1 = buildTrigger(jobDetail);
     Trigger trigger2 = buildTrigger(jobDetail);
@@ -828,170 +867,186 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
     List<OperableTrigger> triggersForJob = jobStore.getTriggersForJob(jobDetail
         .getKey());
-    assertThat(triggersForJob).containsOnly(trigger1, trigger2);
+
+    assertEquals(triggersForJob.size(), 2);
+    assertTrue(triggersForJob.contains(trigger1));
+    assertTrue(triggersForJob.contains(trigger2));
   }
 
   @Test
   public void testPauseTrigger() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger = buildTrigger();
     storeTrigger(trigger);
     TriggerKey triggerKey = trigger.getKey();
     TriggerState triggerState = jobStore.getTriggerState(triggerKey);
-    assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+    assertEquals(triggerState, TriggerState.NORMAL);
     jobStore.pauseTrigger(triggerKey);
     triggerState = jobStore.getTriggerState(triggerKey);
-    assertThat(triggerState).isEqualTo(TriggerState.PAUSED);
+    assertEquals(triggerState, TriggerState.PAUSED);
   }
 
   @Test
   public void testResumeTrigger() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger = buildTrigger();
     storeTrigger(trigger);
     TriggerKey triggerKey = trigger.getKey();
     TriggerState triggerState = jobStore.getTriggerState(triggerKey);
-    assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+    assertEquals(triggerState, TriggerState.NORMAL);
     jobStore.pauseTrigger(triggerKey);
     triggerState = jobStore.getTriggerState(triggerKey);
-    assertThat(triggerState).isEqualTo(TriggerState.PAUSED);
+    assertEquals(triggerState, TriggerState.PAUSED);
 
     jobStore.resumeTrigger(triggerKey);
     triggerState = jobStore.getTriggerState(triggerKey);
-    assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+    assertEquals(triggerState, TriggerState.NORMAL);
   }
 
   @Test
   public void testPauseTriggers() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger = buildAndStoreTrigger();
     Trigger trigger1 = buildAndStoreTrigger();
     Trigger trigger2 = buildTrigger("trigger2", "group2", buildAndStoreJob());
     storeTrigger(trigger2);
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger1.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger1.getKey()),
         TriggerState.NORMAL);
 
     Collection<String> pauseTriggers = jobStore.pauseTriggers(GroupMatcher
         .triggerGroupEquals(trigger.getKey().getGroup()));
 
-    assertThat(pauseTriggers).containsOnly(trigger.getKey().getGroup());
-    assertThat(jobStore.getPausedTriggerGroups()).containsOnly(
-        trigger.getKey().getGroup());
+    assertEquals(pauseTriggers.size(), 1);
+    assertTrue(pauseTriggers.contains(trigger.getKey().getGroup()));
+
+    assertEquals(jobStore.getPausedTriggerGroups().size(), 1);
+    assertTrue(jobStore.getPausedTriggerGroups().contains(
+        trigger.getKey().getGroup()));
 
     Trigger trigger3 = buildAndStoreTrigger();
 
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger1.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger1.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger2.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger2.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger3.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger3.getKey()),
         TriggerState.PAUSED);
   }
 
   @Test
   public void testResumeTriggers() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger = buildAndStoreTrigger();
     Trigger trigger1 = buildAndStoreTrigger();
     Trigger trigger2 = buildTrigger("trigger2", "group2", buildAndStoreJob());
     storeTrigger(trigger2);
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger1.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger1.getKey()),
         TriggerState.NORMAL);
 
     Collection<String> pauseTriggers = jobStore.pauseTriggers(GroupMatcher
         .triggerGroupEquals(trigger.getKey().getGroup()));
 
-    assertThat(pauseTriggers).containsOnly(trigger.getKey().getGroup());
+    assertEquals(pauseTriggers.size(), 1);
+    assertTrue(pauseTriggers.contains(trigger.getKey().getGroup()));
 
     Trigger trigger3 = buildAndStoreTrigger();
 
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger1.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger1.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger2.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger2.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger3.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger3.getKey()),
         TriggerState.PAUSED);
 
     Collection<String> resumeTriggers = jobStore.resumeTriggers(GroupMatcher
         .triggerGroupEquals(trigger.getKey().getGroup()));
 
-    assertThat(resumeTriggers).containsOnly(trigger.getKey().getGroup());
+    assertEquals(resumeTriggers.size(), 1);
+    assertTrue(resumeTriggers.contains(trigger.getKey().getGroup()));
 
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger1.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger1.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger3.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger3.getKey()),
         TriggerState.NORMAL);
 
     Trigger trigger4 = buildAndStoreTrigger();
-    assertThat(jobStore.getTriggerState(trigger4.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger4.getKey()),
         TriggerState.NORMAL);
   }
 
   @Test
   public void testResumeTriggerWithPausedJobs()
       throws ObjectAlreadyExistsException, JobPersistenceException {
+
     JobDetail job1 = buildJob("job", "group3");
     storeJob(job1);
     Trigger trigger5 = buildTrigger(job1);
     storeTrigger(trigger5);
 
-    assertThat(jobStore.getTriggerState(trigger5.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger5.getKey()),
         TriggerState.NORMAL);
     jobStore.pauseJobs(GroupMatcher.jobGroupEquals("group3"));
     jobStore.resumeTriggers(GroupMatcher.triggerGroupEquals(trigger5.getKey()
         .getGroup()));
-    assertThat(jobStore.getTriggerState(trigger5.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger5.getKey()),
         TriggerState.PAUSED);
   }
 
   @Test
   public void testPauseJob() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail jobDetail = buildAndStoreJob();
     Trigger trigger = buildTrigger(jobDetail);
     storeTrigger(trigger);
     TriggerState triggerState = jobStore.getTriggerState(trigger.getKey());
-    assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+    assertEquals(triggerState, TriggerState.NORMAL);
 
     jobStore.pauseJob(jobDetail.getKey());
 
     triggerState = jobStore.getTriggerState(trigger.getKey());
-    assertThat(triggerState).isEqualTo(TriggerState.PAUSED);
+    assertEquals(triggerState, TriggerState.PAUSED);
   }
 
   @Test
   public void testResumeJob() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail jobDetail = buildAndStoreJob();
     Trigger trigger = buildTrigger(jobDetail);
     storeTrigger(trigger);
     TriggerState triggerState = jobStore.getTriggerState(trigger.getKey());
-    assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+    assertEquals(triggerState, TriggerState.NORMAL);
 
     jobStore.pauseJob(jobDetail.getKey());
 
     triggerState = jobStore.getTriggerState(trigger.getKey());
-    assertThat(triggerState).isEqualTo(TriggerState.PAUSED);
+    assertEquals(triggerState, TriggerState.PAUSED);
 
     jobStore.resumeJob(jobDetail.getKey());
 
     triggerState = jobStore.getTriggerState(trigger.getKey());
-    assertThat(triggerState).isEqualTo(TriggerState.NORMAL);
+    assertEquals(triggerState, TriggerState.NORMAL);
   }
 
   @Test
   public void testPauseJobs() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail job1 = buildAndStoreJobWithTrigger();
     JobDetail job2 = buildAndStoreJobWithTrigger();
 
@@ -1002,14 +1057,15 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
         .getKey());
     triggersForJob.addAll(jobStore.getTriggersForJob(job2.getKey()));
     for (OperableTrigger trigger : triggersForJob) {
-      assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+      assertEquals(jobStore.getTriggerState(trigger.getKey()),
           TriggerState.NORMAL);
     }
 
     Collection<String> pauseJobs = jobStore.pauseJobs(GroupMatcher
         .jobGroupEquals(job1.getKey().getGroup()));
 
-    assertThat(pauseJobs).containsOnly(job1.getKey().getGroup());
+    assertEquals(pauseJobs.size(), 1);
+    assertTrue(pauseJobs.contains(job1.getKey().getGroup()));
 
     JobDetail job4 = buildAndStoreJobWithTrigger();
 
@@ -1021,16 +1077,16 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
       log.debug("State : [" + triggerState
           + "]Should be PAUSED for trigger : [" + trigger.getKey()
           + "] and job [" + trigger.getJobKey() + "]");
-      assertThat(triggerState).isEqualTo(TriggerState.PAUSED)
-          .overridingErrorMessage(
-              "Should be PAUSED for trigger : [" + trigger.getKey()
-                  + "] and job [" + trigger.getJobKey() + "]");
+      assertEquals(triggerState, TriggerState.PAUSED);
+      //          .overridingErrorMessage(
+      //              "Should be PAUSED for trigger : [" + trigger.getKey()
+      //                  + "] and job [" + trigger.getJobKey() + "]");
     }
 
     triggersForJob = jobStore.getTriggersForJob(job3.getKey());
 
     for (OperableTrigger trigger : triggersForJob) {
-      assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+      assertEquals(jobStore.getTriggerState(trigger.getKey()),
           TriggerState.NORMAL);
     }
   }
@@ -1038,6 +1094,7 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
   @Test
   public void testResumeJobs() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     JobDetail job1 = buildAndStoreJobWithTrigger();
     JobDetail job2 = buildAndStoreJob();
     Trigger trigger2 = buildTrigger("trigger", "trigGroup2", job2);
@@ -1050,22 +1107,24 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
     Collection<String> pauseJobs = jobStore.pauseJobs(GroupMatcher
         .anyJobGroup());
 
-    assertThat(pauseJobs).containsOnly(job1.getKey().getGroup(), "newgroup");
+    assertEquals(pauseJobs.size(), 2);
+    assertTrue(pauseJobs.contains(job1.getKey().getGroup()));
+    assertTrue(pauseJobs.contains("newgroup"));
 
     List<OperableTrigger> triggersForJob = jobStore.getTriggersForJob(job1
         .getKey());
 
     for (OperableTrigger trigger : triggersForJob) {
       TriggerState triggerState = jobStore.getTriggerState(trigger.getKey());
-      assertThat(triggerState).isEqualTo(TriggerState.PAUSED)
-          .overridingErrorMessage(
-              "Should be PAUSED for trigger : [" + trigger.getKey()
-                  + "] and job [" + trigger.getJobKey() + "]");
+      assertEquals(triggerState, TriggerState.PAUSED);
+      //          .overridingErrorMessage(
+      //              "Should be PAUSED for trigger : [" + trigger.getKey()
+      //                  + "] and job [" + trigger.getJobKey() + "]");
     }
 
     triggersForJob = jobStore.getTriggersForJob(job3.getKey());
     for (OperableTrigger trigger : triggersForJob) {
-      assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+      assertEquals(jobStore.getTriggerState(trigger.getKey()),
           TriggerState.PAUSED);
     }
 
@@ -1075,13 +1134,13 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
 
     triggersForJob = jobStore.getTriggersForJob(job3.getKey());
     for (OperableTrigger trigger : triggersForJob) {
-      assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+      assertEquals(jobStore.getTriggerState(trigger.getKey()),
           TriggerState.PAUSED);
     }
 
     triggersForJob = jobStore.getTriggersForJob(job1.getKey());
     for (OperableTrigger trigger : triggersForJob) {
-      assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+      assertEquals(jobStore.getTriggerState(trigger.getKey()),
           TriggerState.NORMAL);
     }
   }
@@ -1089,64 +1148,73 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
   @Test
   public void testPauseAll() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger = buildAndStoreTrigger();
     Trigger trigger2 = buildTrigger("trigger2", "group2", buildAndStoreJob());
     storeTrigger(trigger2);
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.NORMAL);
 
     jobStore.pauseAll();
 
-    assertThat(jobStore.getPausedTriggerGroups()).containsOnly(
-        trigger.getKey().getGroup(), trigger2.getKey().getGroup());
+    assertEquals(jobStore.getPausedTriggerGroups().size(), 2);
+    assertTrue(jobStore.getPausedTriggerGroups().contains(
+        trigger.getKey().getGroup()));
+    assertTrue(jobStore.getPausedTriggerGroups().contains(
+        trigger2.getKey().getGroup()));
 
     Trigger trigger3 = buildAndStoreTrigger();
 
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger2.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger2.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger3.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger3.getKey()),
         TriggerState.PAUSED);
   }
 
   @Test
   public void testResumeAll() throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     Trigger trigger = buildAndStoreTrigger();
     Trigger trigger2 = buildTrigger("trigger2", "group2", buildAndStoreJob());
     storeTrigger(trigger2);
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.NORMAL);
 
     jobStore.pauseAll();
 
-    assertThat(jobStore.getPausedTriggerGroups()).containsOnly(
-        trigger.getKey().getGroup(), trigger2.getKey().getGroup());
+    assertEquals(jobStore.getPausedTriggerGroups().size(), 2);
+    assertTrue(jobStore.getPausedTriggerGroups().contains(
+        trigger.getKey().getGroup()));
+    assertTrue(jobStore.getPausedTriggerGroups().contains(
+        trigger2.getKey().getGroup()));
 
     Trigger trigger3 = buildAndStoreTrigger();
 
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger2.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger2.getKey()),
         TriggerState.PAUSED);
-    assertThat(jobStore.getTriggerState(trigger3.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger3.getKey()),
         TriggerState.PAUSED);
 
     jobStore.resumeAll();
-    assertThat(jobStore.getTriggerState(trigger.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger2.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger2.getKey()),
         TriggerState.NORMAL);
-    assertThat(jobStore.getTriggerState(trigger3.getKey())).isEqualTo(
+    assertEquals(jobStore.getTriggerState(trigger3.getKey()),
         TriggerState.NORMAL);
   }
 
   @Test
   public void testGetTriggerState() throws JobPersistenceException {
+
     TriggerState triggerState = jobStore.getTriggerState(new TriggerKey(
         "noname"));
-    assertThat(triggerState).isEqualTo(TriggerState.NONE);
+    assertEquals(triggerState, TriggerState.NONE);
 
   }
 }

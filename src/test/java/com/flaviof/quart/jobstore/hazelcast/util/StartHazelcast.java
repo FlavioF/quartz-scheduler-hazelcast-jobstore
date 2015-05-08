@@ -1,4 +1,4 @@
-package org.ameausoone.util;
+package com.flaviof.quart.jobstore.hazelcast.util;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;

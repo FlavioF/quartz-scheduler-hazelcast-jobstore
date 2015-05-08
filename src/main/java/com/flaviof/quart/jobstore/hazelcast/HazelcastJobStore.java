@@ -1,4 +1,4 @@
-package org.ameausoone;
+package com.flaviof.quart.jobstore.hazelcast;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
@@ -23,14 +23,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
-import static org.ameausoone.TriggerState.ACQUIRED;
-import static org.ameausoone.TriggerState.BLOCKED;
-import static org.ameausoone.TriggerState.NORMAL;
-import static org.ameausoone.TriggerState.PAUSED;
-import static org.ameausoone.TriggerState.STATE_COMPLETED;
-import static org.ameausoone.TriggerState.WAITING;
-import static org.ameausoone.TriggerState.toClassicTriggerState;
-import static org.ameausoone.TriggerWrapper.newTriggerWrapper;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerState.ACQUIRED;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerState.BLOCKED;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerState.NORMAL;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerState.PAUSED;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerState.STATE_COMPLETED;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerState.WAITING;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerState.toClassicTriggerState;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Calendar;
@@ -60,16 +60,11 @@ import org.slf4j.LoggerFactory;
 public class HazelcastJobStore implements JobStore, Serializable {
 
   public static final String HC_JOB_STORE_MAP_JOB = "job-store-map-job";
-  public static final String HC_JOB_STORE_MAP_JOB_BY_GROUP_MAP
-      = "job-store-map-job-by-group-map";
-  public static final String HC_JOB_STORE_TRIGGER_BY_KEY_MAP
-      = "job-store-trigger-by-key-map";
-  public static final String HC_JOB_STORE_TRIGGER_KEY_BY_GROUP_MAP
-      = "job-trigger-key-by-group-map";
-  public static final String HC_JOB_STORE_PAUSED_TRIGGER_GROUPS
-      = "job-paused-trigger-groups";
-  public static final String HC_JOB_STORE_PAUSED_JOB_GROUPS
-      = "job-paused-job-groups";
+  public static final String HC_JOB_STORE_MAP_JOB_BY_GROUP_MAP = "job-store-map-job-by-group-map";
+  public static final String HC_JOB_STORE_TRIGGER_BY_KEY_MAP = "job-store-trigger-by-key-map";
+  public static final String HC_JOB_STORE_TRIGGER_KEY_BY_GROUP_MAP = "job-trigger-key-by-group-map";
+  public static final String HC_JOB_STORE_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
+  public static final String HC_JOB_STORE_PAUSED_JOB_GROUPS = "job-paused-job-groups";
   public static final String HC_JOB_CALENDAR_MAP = "job-calendar-map";
 
   private static final Logger log = LoggerFactory
@@ -96,12 +91,14 @@ public class HazelcastJobStore implements JobStore, Serializable {
       .basicDateTimeNoMillis();
 
   public String getInstanceId() {
+
     return instanceId;
   }
 
   @Override
   public void initialize(ClassLoadHelper loadHelper, SchedulerSignaler signaler)
       throws SchedulerConfigException {
+
     log.info("Initializing HazelcastJobStore..");
 
     final ClientConfig clientConfig = new ClientConfig();
@@ -130,14 +127,17 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void schedulerStarted() throws SchedulerException {
+
     log.info("Start HazelcastJobStore");
   }
 
   public long getMisfireThreshold() {
+
     return misfireThreshold;
   }
 
   public void setMisfireThreshold(long misfireThreshold) {
+
     if (misfireThreshold < 1) {
       throw new IllegalArgumentException(
           "Misfire threshold must be larger than 0");
@@ -147,33 +147,39 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void schedulerPaused() {
+
     schedulerRunning = false;
 
   }
 
   @Override
   public void schedulerResumed() {
+
     schedulerRunning = true;
   }
 
   @Override
   public void shutdown() {
+
     hazelcastClient.shutdown();
   }
 
   @Override
   public boolean supportsPersistence() {
+
     return true;
   }
 
   @Override
   public long getEstimatedTimeToReleaseAndAcquireTrigger() {
+
     // C/C from RAMJobStore
     return 5;
   }
 
   @Override
   public boolean isClustered() {
+
     return true;
   }
 
@@ -181,6 +187,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void storeJobAndTrigger(final JobDetail newJob,
       final OperableTrigger newTrigger) throws ObjectAlreadyExistsException,
       JobPersistenceException {
+
     storeJob(newJob, false);
     storeTrigger(newTrigger, false);
   }
@@ -240,6 +247,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public boolean removeJob(final JobKey jobKey) throws JobPersistenceException {
+
     boolean removed = false;
     if (jobsByKey.containsKey(jobKey)) {
       final List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
@@ -263,6 +271,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public boolean removeJobs(final List<JobKey> jobKeys)
       throws JobPersistenceException {
+
     boolean allRemoved = true;
 
     for (final JobKey key : jobKeys) {
@@ -275,15 +284,17 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public JobDetail retrieveJob(final JobKey jobKey)
       throws JobPersistenceException {
+
     return jobKey != null && jobsByKey.containsKey(jobKey)
         ? (JobDetail) jobsByKey
-        .get(jobKey).clone()
+            .get(jobKey).clone()
         : null;
   }
 
   @Override
   public void storeTrigger(OperableTrigger trigger, boolean replaceExisting)
       throws ObjectAlreadyExistsException, JobPersistenceException {
+
     final OperableTrigger newTrigger = (OperableTrigger) trigger.clone();
     final TriggerKey triggerKey = newTrigger.getKey();
 
@@ -316,6 +327,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public boolean removeTrigger(TriggerKey triggerKey)
       throws JobPersistenceException {
+
     return removeTrigger(triggerKey, true);
   }
 
@@ -353,12 +365,14 @@ public class HazelcastJobStore implements JobStore, Serializable {
   }
 
   private void storeTriggerWrapper(final TriggerWrapper tw) {
+
     triggersByKey.put(tw.key, tw);
   }
 
   @Override
   public boolean removeTriggers(final List<TriggerKey> triggerKeys)
       throws JobPersistenceException {
+
     boolean allRemoved = true;
     for (TriggerKey key : triggerKeys) {
       allRemoved = removeTrigger(key) && allRemoved;
@@ -370,6 +384,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public boolean replaceTrigger(final TriggerKey triggerKey,
       final OperableTrigger newTrigger) throws JobPersistenceException {
+
     newTrigger.setKey(triggerKey);
     storeTrigger(newTrigger, true);
     return true;
@@ -381,18 +396,20 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     return triggerKey != null && triggersByKey.containsKey(triggerKey)
         ? (OperableTrigger) triggersByKey
-        .get(triggerKey).getTrigger().clone()
+            .get(triggerKey).getTrigger().clone()
         : null;
   }
 
   @Override
   public boolean checkExists(JobKey jobKey) throws JobPersistenceException {
+
     return jobsByKey.containsKey(jobKey);
   }
 
   @Override
   public boolean checkExists(TriggerKey triggerKey)
       throws JobPersistenceException {
+
     return triggersByKey.containsKey(triggerKey);
   }
 
@@ -426,6 +443,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void storeCalendar(final String calName, final Calendar cal,
       boolean replaceExisting, boolean updateTriggers)
       throws ObjectAlreadyExistsException, JobPersistenceException {
+
     final Calendar calendar = (Calendar) cal.clone();
     if (calendarsByName.containsKey(calName) && !replaceExisting) {
       throw new ObjectAlreadyExistsException("Calendar with name '" + calName +
@@ -437,6 +455,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public boolean removeCalendar(String calName) throws JobPersistenceException {
+
     int numRefs = 0;
     for (TriggerWrapper trigger : triggersByKey.values()) {
       OperableTrigger trigg = trigger.trigger;
@@ -456,115 +475,124 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public Calendar retrieveCalendar(String calName)
       throws JobPersistenceException {
+
     return calendarsByName.get(calName);
   }
 
   @Override
   public int getNumberOfJobs() throws JobPersistenceException {
+
     return jobsByKey.size();
   }
 
   @Override
   public int getNumberOfTriggers() throws JobPersistenceException {
+
     return triggersByKey.size();
   }
 
   @Override
   public int getNumberOfCalendars() throws JobPersistenceException {
+
     return calendarsByName.size();
   }
 
   @Override
   public Set<JobKey> getJobKeys(final GroupMatcher<JobKey> matcher)
       throws JobPersistenceException {
+
     Set<JobKey> outList = null;
     final StringMatcher.StringOperatorName operator = matcher
         .getCompareWithOperator();
     final String groupNameCompareValue = matcher.getCompareToValue();
 
     switch (operator) {
-      case EQUALS:
-        final Collection<JobKey> jobKeys = jobsByGroup.
-            get(groupNameCompareValue);
-        if (jobKeys != null) {
-          outList = new HashSet<>();
-          for (JobKey jobKey : jobKeys) {
+    case EQUALS:
+      final Collection<JobKey> jobKeys = jobsByGroup.
+          get(groupNameCompareValue);
+      if (jobKeys != null) {
+        outList = new HashSet<>();
+        for (JobKey jobKey : jobKeys) {
+          if (jobKey != null) {
+            outList.add(jobKey);
+          }
+        }
+      }
+      break;
+    default:
+      for (String groupName : jobsByGroup.keySet()) {
+        if (operator.evaluate(groupName, groupNameCompareValue)) {
+          if (outList == null) {
+            outList = new HashSet<>();
+          }
+          for (JobKey jobKey : jobsByGroup.get(groupName)) {
             if (jobKey != null) {
               outList.add(jobKey);
             }
           }
         }
-        break;
-      default:
-        for (String groupName : jobsByGroup.keySet()) {
-          if (operator.evaluate(groupName, groupNameCompareValue)) {
-            if (outList == null) {
-              outList = new HashSet<>();
-            }
-            for (JobKey jobKey : jobsByGroup.get(groupName)) {
-              if (jobKey != null) {
-                outList.add(jobKey);
-              }
-            }
-          }
-        }
+      }
     }
     return outList == null
-        ? java.util.Collections.<JobKey>emptySet()
+        ? java.util.Collections.<JobKey> emptySet()
         : outList;
   }
 
   @Override
   public Set<TriggerKey> getTriggerKeys(GroupMatcher<TriggerKey> matcher)
       throws JobPersistenceException {
+
     Set<TriggerKey> outList = null;
     StringMatcher.StringOperatorName operator = matcher
         .getCompareWithOperator();
     String groupNameCompareValue = matcher.getCompareToValue();
     switch (operator) {
-      case EQUALS:
-        Collection<TriggerKey> triggerKeys = triggersByGroup
-            .get(groupNameCompareValue);
-        if (triggerKeys != null) {
-          outList = newHashSet();
-          for (TriggerKey triggerKey : triggerKeys) {
+    case EQUALS:
+      Collection<TriggerKey> triggerKeys = triggersByGroup
+          .get(groupNameCompareValue);
+      if (triggerKeys != null) {
+        outList = newHashSet();
+        for (TriggerKey triggerKey : triggerKeys) {
+          if (triggerKey != null) {
+            outList.add(triggerKey);
+          }
+        }
+      }
+      break;
+    default:
+      for (String groupName : triggersByGroup.keySet()) {
+        if (operator.evaluate(groupName, groupNameCompareValue)) {
+          if (outList == null) {
+            outList = newHashSet();
+          }
+          for (TriggerKey triggerKey : triggersByGroup.get(groupName)) {
             if (triggerKey != null) {
               outList.add(triggerKey);
             }
           }
         }
-        break;
-      default:
-        for (String groupName : triggersByGroup.keySet()) {
-          if (operator.evaluate(groupName, groupNameCompareValue)) {
-            if (outList == null) {
-              outList = newHashSet();
-            }
-            for (TriggerKey triggerKey : triggersByGroup.get(groupName)) {
-              if (triggerKey != null) {
-                outList.add(triggerKey);
-              }
-            }
-          }
-        }
+      }
     }
     return outList == null
-        ? java.util.Collections.<TriggerKey>emptySet()
+        ? java.util.Collections.<TriggerKey> emptySet()
         : outList;
   }
 
   @Override
   public List<String> getJobGroupNames() throws JobPersistenceException {
+
     return newArrayList(jobsByGroup.keySet());
   }
 
   @Override
   public List<String> getTriggerGroupNames() throws JobPersistenceException {
+
     return new LinkedList<>(triggersByGroup.keySet());
   }
 
   @Override
   public List<String> getCalendarNames() throws JobPersistenceException {
+
     return new LinkedList<>(calendarsByName.keySet());
   }
 
@@ -585,6 +613,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public void pauseTrigger(TriggerKey triggerKey)
       throws JobPersistenceException {
+
     triggersByKey.lock(triggerKey);
     try {
       final TriggerWrapper newTrigger = newTriggerWrapper(
@@ -598,9 +627,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public org.quartz.Trigger.TriggerState getTriggerState(TriggerKey triggerKey)
       throws JobPersistenceException {
+
     triggersByKey.lock(triggerKey);
-    org.quartz.Trigger.TriggerState result
-        = org.quartz.Trigger.TriggerState.NONE;
+    org.quartz.Trigger.TriggerState result = org.quartz.Trigger.TriggerState.NONE;
     try {
       TriggerWrapper tw = triggersByKey.get(triggerKey);
       if (tw != null) {
@@ -615,6 +644,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public void resumeTrigger(TriggerKey triggerKey)
       throws JobPersistenceException {
+
     triggersByKey.lock(triggerKey);
     try {
       final TriggerWrapper newTrigger = newTriggerWrapper(
@@ -628,23 +658,24 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public Collection<String> pauseTriggers(GroupMatcher<TriggerKey> matcher)
       throws JobPersistenceException {
+
     List<String> pausedGroups = new LinkedList<>();
     StringMatcher.StringOperatorName operator = matcher
         .getCompareWithOperator();
     switch (operator) {
-      case EQUALS:
-        if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
-          pausedGroups.add(matcher.getCompareToValue());
-        }
-        break;
-      default:
-        for (String group : triggersByGroup.keySet()) {
-          if (operator.evaluate(group, matcher.getCompareToValue())) {
-            if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
-              pausedGroups.add(group);
-            }
+    case EQUALS:
+      if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
+        pausedGroups.add(matcher.getCompareToValue());
+      }
+      break;
+    default:
+      for (String group : triggersByGroup.keySet()) {
+        if (operator.evaluate(group, matcher.getCompareToValue())) {
+          if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
+            pausedGroups.add(group);
           }
         }
+      }
     }
 
     for (String pausedGroup : pausedGroups) {
@@ -660,6 +691,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public Collection<String> resumeTriggers(GroupMatcher<TriggerKey> matcher)
       throws JobPersistenceException {
+
     Set<String> resumeGroups = new HashSet<>();
     Set<TriggerKey> keys = getTriggerKeys(matcher);
     for (TriggerKey triggerKey : keys) {
@@ -680,6 +712,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void pauseJob(JobKey jobKey) throws JobPersistenceException {
+
     boolean found = jobsByKey.containsKey(jobKey);
     if (!found) {
       return;
@@ -697,6 +730,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void resumeJob(JobKey jobKey) throws JobPersistenceException {
+
     boolean found = jobsByKey.containsKey(jobKey);
     if (!found) {
       return;
@@ -716,23 +750,24 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public Collection<String> pauseJobs(GroupMatcher<JobKey> groupMatcher)
       throws JobPersistenceException {
+
     List<String> pausedGroups = new LinkedList<>();
     StringMatcher.StringOperatorName operator = groupMatcher
         .getCompareWithOperator();
     switch (operator) {
-      case EQUALS:
-        if (pausedJobGroups.add(groupMatcher.getCompareToValue())) {
-          pausedGroups.add(groupMatcher.getCompareToValue());
-        }
-        break;
-      default:
-        for (String jobGroup : jobsByGroup.keySet()) {
-          if (operator.evaluate(jobGroup, groupMatcher.getCompareToValue())) {
-            if (pausedJobGroups.add(jobGroup)) {
-              pausedGroups.add(jobGroup);
-            }
+    case EQUALS:
+      if (pausedJobGroups.add(groupMatcher.getCompareToValue())) {
+        pausedGroups.add(groupMatcher.getCompareToValue());
+      }
+      break;
+    default:
+      for (String jobGroup : jobsByGroup.keySet()) {
+        if (operator.evaluate(jobGroup, groupMatcher.getCompareToValue())) {
+          if (pausedJobGroups.add(jobGroup)) {
+            pausedGroups.add(jobGroup);
           }
         }
+      }
     }
 
     for (String groupName : pausedGroups) {
@@ -761,11 +796,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public Set<String> getPausedTriggerGroups() throws JobPersistenceException {
+
     return new HashSet<>(pausedTriggerGroups);
   }
 
   @Override
   public void pauseAll() throws JobPersistenceException {
+
     for (String triggerGroup : triggersByGroup.keySet()) {
       pauseTriggers(GroupMatcher.triggerGroupEquals(triggerGroup));
     }
@@ -773,6 +810,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void resumeAll() throws JobPersistenceException {
+
     List<String> triggerGroupNames = getTriggerGroupNames();
     for (String triggerGroup : triggerGroupNames) {
       resumeTriggers(GroupMatcher.triggerGroupEquals(triggerGroup));
@@ -781,6 +819,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   private Collection<TriggerWrapper> getTimeTriggers(long noLaterThan,
       long timeWindow) {
+
     long noEarlierThan = getMisfireTime();
     long noLaterThanWithTimeWindow = noLaterThan + timeWindow;
     if (noLaterThanWithTimeWindow < noEarlierThan) {
@@ -807,18 +846,19 @@ public class HazelcastJobStore implements JobStore, Serializable {
    * @see org.quartz.spi.JobStore#acquireNextTriggers(long, int, long)
    *
    * @param noLaterThan
-   * highest value of <code>getNextFireTime()</code> of the triggers
-   * (exclusive)
+   *          highest value of <code>getNextFireTime()</code> of the triggers
+   *          (exclusive)
    * @param timeWindow
-   * highest value of <code>getNextFireTime()</code> of the triggers
-   * (inclusive)
+   *          highest value of <code>getNextFireTime()</code> of the triggers
+   *          (inclusive)
    * @param maxCount
-   * maximum number of trigger keys allow to acquired in the returning
-   * list.
+   *          maximum number of trigger keys allow to acquired in the returning
+   *          list.
    */
   @Override
   public List<OperableTrigger> acquireNextTriggers(long noLaterThan,
       int maxCount, long timeWindow) throws JobPersistenceException {
+
     final List<OperableTrigger> result = new ArrayList<>();
     final Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<>();
     final Set<TriggerWrapper> excludedTriggers = new HashSet<>();
@@ -903,14 +943,17 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   private boolean applyMisfire(TriggerWrapper tw)
       throws JobPersistenceException {
+
     long misfireTime = System.currentTimeMillis();
     if (getMisfireThreshold() > 0) {
       misfireTime -= getMisfireThreshold();
     }
 
     Date tnft = tw.trigger.getNextFireTime();
-    if (tnft == null ||
-        tnft.getTime() > misfireTime ||
+    if (tnft == null
+        ||
+        tnft.getTime() > misfireTime
+        ||
         tw.trigger.getMisfireInstruction() == Trigger.MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY) {
       return false;
     }
@@ -936,6 +979,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   }
 
   protected long getMisfireTime() {
+
     long misfireTime = System.currentTimeMillis();
     if (getMisfireThreshold() > 0) {
       misfireTime -= getMisfireThreshold();
@@ -949,11 +993,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private static long ftrCtr = System.currentTimeMillis();
 
   protected synchronized String getFiredTriggerRecordId() {
+
     return getInstanceId() + ftrCtr++;
   }
 
   @Override
   public void releaseAcquiredTrigger(OperableTrigger trigger) {
+
     TriggerKey triggerKey = trigger.getKey();
     triggersByKey.lock(triggerKey);
     try {
@@ -967,6 +1013,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public List<TriggerFiredResult> triggersFired(
       List<OperableTrigger> firedTriggers) throws JobPersistenceException {
+
     List<TriggerFiredResult> results = new ArrayList<>();
 
     for (OperableTrigger trigger : firedTriggers) {
@@ -1030,22 +1077,26 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void setInstanceId(String schedInstId) {
+
     // ignore
   }
 
   @Override
   public void setThreadPoolSize(int poolSize) {
+
     // ignore
   }
 
   @Override
   public void triggeredJobComplete(OperableTrigger trigger,
       JobDetail jobDetail, Trigger.CompletedExecutionInstruction triggerInstCode) {
+
     // ignore
   }
 
   @Override
   public void setInstanceName(final String instanceName) {
+
     this.instanceName = instanceName;
   }
 
@@ -1061,11 +1112,13 @@ class TriggerByJobPredicate implements Predicate<JobKey, TriggerWrapper> {
   private JobKey key;
 
   public TriggerByJobPredicate(JobKey key) {
+
     this.key = key;
   }
 
   @Override
   public boolean apply(Entry<JobKey, TriggerWrapper> entry) {
+
     return key != null && entry != null && key.equals(entry.getValue().jobKey);
   }
 }
@@ -1083,12 +1136,14 @@ class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
 
   public TriggersPredicate(long noEarlierThan, long noLaterThanWithTimeWindow,
       TriggerState state) {
+
     this.noEarlierThan = noEarlierThan;
     this.noLaterThanWithTimeWindow = noLaterThanWithTimeWindow;
     this.state = state;
   }
 
   public TriggersPredicate(long noEarlierThan, long noLaterThanWithTimeWindow) {
+
     this.noEarlierThan = noEarlierThan;
     this.noLaterThanWithTimeWindow = noLaterThanWithTimeWindow;
     this.state = TriggerState.ACQUIRED;
@@ -1096,6 +1151,7 @@ class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
 
   @Override
   public boolean apply(Entry<TriggerKey, TriggerWrapper> entry) {
+
     long nextFireTime = entry.getValue().getNextFireTime();
     return nextFireTime >= noEarlierThan &&
         nextFireTime <= noLaterThanWithTimeWindow &&
