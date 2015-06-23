@@ -1038,7 +1038,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
       // call triggered on our copy, and the scheduler's copy
       tw.trigger.triggered(cal);
       trigger.triggered(cal);
-      // tw.state = TriggerWrapper.STATE_EXECUTING;
+      
+      storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
 
       TriggerFiredBundle bndle = new TriggerFiredBundle(retrieveJob(tw.jobKey),
           trigger, cal, false, new Date(), trigger.getPreviousFireTime(),

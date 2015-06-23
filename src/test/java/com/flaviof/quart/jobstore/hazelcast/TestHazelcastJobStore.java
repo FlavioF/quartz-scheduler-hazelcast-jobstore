@@ -30,6 +30,7 @@ import org.quartz.spi.ClassLoadHelper;
 import org.quartz.spi.JobStore;
 import org.quartz.spi.OperableTrigger;
 import org.quartz.spi.SchedulerSignaler;
+import org.quartz.spi.TriggerFiredResult;
 import org.testng.Assert;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -1216,5 +1217,35 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
         "noname"));
     assertEquals(triggerState, TriggerState.NONE);
 
+  }
+
+  @Test
+  public void testTriggersFired() throws Exception {
+
+    Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
+    long baseFireTime = baseFireTimeDate.getTime();
+
+    this.jobStore.storeJob(fJobDetail, false);
+
+    OperableTrigger trigger1 = new SimpleTriggerImpl("triggerFired1",
+        "triggerFiredGroup", this.fJobDetail.getName(), this.fJobDetail.getGroup(),
+        new Date(baseFireTime + 100), new Date(baseFireTime + 100), 2,
+        2000);
+    trigger1.computeFirstFireTime(null);
+
+    this.jobStore.storeTrigger(trigger1, false);
+
+    long firstFireTime = new Date(trigger1.getNextFireTime().getTime())
+        .getTime();
+
+    List<OperableTrigger> acquiredTriggers = this.jobStore.acquireNextTriggers(firstFireTime + 500, 1, 0L);
+    assertEquals(1, acquiredTriggers.size());
+
+    List<TriggerFiredResult> triggerFired = this.jobStore.triggersFired(acquiredTriggers);
+    assertEquals(triggerFired.size(), 1);
+
+    assertTrue(this.jobStore.checkExists(trigger1.getKey()));
+    assertEquals(this.jobStore.getTriggerState(trigger1.getKey()), TriggerState.NORMAL);
+    this.jobStore.removeTrigger(trigger1.getKey());
   }
 }
