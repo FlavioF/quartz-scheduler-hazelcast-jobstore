@@ -5,7 +5,6 @@ import java.util.Date;
 import org.quartz.JobKey;
 import org.quartz.TriggerKey;
 import org.quartz.spi.OperableTrigger;
-import com.google.common.base.Objects;
 
 class TriggerWrapper implements Serializable {
 
@@ -84,29 +83,15 @@ class TriggerWrapper implements Serializable {
     return this.trigger;
   }
 
-  @Override
-  public String toString() {
-
-    return Objects
-        .toStringHelper(this)
-        //
-        .add("key", key)
-        //
-        .add("jobKey", jobKey)
-        //
-        .add("state", getState())
-        //
-        .add("nextFireTime", getNextFireTime())
-        //
-
-        .add("nextFireTime-iso",
-            HazelcastJobStore.FORMATTER.print(getNextFireTime())) //
-        .toString();
-  }
-
   public TriggerState getState() {
 
     return state;
+  }
+
+  @Override
+  public String toString() {
+
+    return "TriggerWrapper{" + "trigger=" + trigger + ", state=" + state + ", nextFireTime=" + nextFireTime + '}';
   }
 
 }

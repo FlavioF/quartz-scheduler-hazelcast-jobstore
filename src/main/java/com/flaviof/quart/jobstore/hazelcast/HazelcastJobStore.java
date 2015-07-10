@@ -1153,7 +1153,12 @@ class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
   @Override
   public boolean apply(Entry<TriggerKey, TriggerWrapper> entry) {
 
+    if (entry.getValue().getNextFireTime() == null) {
+      return false;
+    }
+
     long nextFireTime = entry.getValue().getNextFireTime();
+    
     return nextFireTime >= noEarlierThan &&
         nextFireTime <= noLaterThanWithTimeWindow &&
         entry.getValue().getState() != state;
