@@ -39,7 +39,7 @@ cd quartz-scheduler-hazelcast-jobstore
 mvn clean install
 ```
 
-### Configuring HazelcastJobStore
+### How to Use HazelcastJobStore with Quartz
 ```
 Properties props = new Properties();
 props.setProperty(StdSchedulerFactory.PROP_JOB_STORE_CLASS, HazelcastJobStore.class.getName());
@@ -47,4 +47,5 @@ props.setProperty(StdSchedulerFactory.PROP_JOB_STORE_CLASS, HazelcastJobStore.cl
 StdSchedulerFactory scheduler = new StdSchedulerFactory(props).getScheduler();
 ```
 
-
+### Notes
+- In Hazelcast Job Store neither FIFO or LIFO are supported
