@@ -128,8 +128,8 @@ public class TestHazelcastJobStore extends AbstractTestHazelcastJobStore {
         OperableTrigger missfiredTriger = jobStore.getTriggersForJob(job.getKey())
                 .stream()
                 .filter(item
-                        -> item.getNextFireTime() != t1.getNextFireTime()
-                        && item.getNextFireTime() != t2.getNextFireTime())
+                        -> item.getNextFireTime().getTime() != t1.getNextFireTime().getTime()
+                        && item.getNextFireTime().getTime() != t2.getNextFireTime().getTime())
                 .findFirst()
                 .get();
 

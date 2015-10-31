@@ -853,7 +853,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         if (triggersByKey.isEmpty()) {
             return Collections.EMPTY_LIST;
         }
-        
+
         long limit = noLaterThan + timeWindow;
         Collection<TriggerWrapper> triggers = triggersByKey.values(new TriggersPredicate(limit));
         if (triggers.isEmpty()) {
@@ -1149,7 +1149,7 @@ class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
             return false;
         }
 
-        return entry.getValue().getTrigger().getNextFireTime().getTime() <= noLaterThanWithTimeWindow
+        return entry.getValue().getNextFireTime() <= noLaterThanWithTimeWindow
                 && entry.getValue().getState() != state;
     }
 }
