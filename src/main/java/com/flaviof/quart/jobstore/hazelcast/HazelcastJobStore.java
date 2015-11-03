@@ -52,6 +52,9 @@ import org.quartz.spi.TriggerFiredBundle;
 import org.quartz.spi.TriggerFiredResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Sets.newHashSet;
+import static com.flaviof.quart.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
 
 /**
  *
@@ -856,6 +859,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
         long limit = noLaterThan + timeWindow;
         Collection<TriggerWrapper> triggers = triggersByKey.values(new TriggersPredicate(limit));
+//        Collection<TriggerWrapper> triggers = triggersByKey.values();
+
         if (triggers.isEmpty()) {
             return Collections.EMPTY_LIST;
         }
@@ -1128,13 +1133,13 @@ class TriggerByJobPredicate implements Predicate<JobKey, TriggerWrapper> {
 class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
 
     long noLaterThanWithTimeWindow;
-    TriggerState state;
+    TriggerState noState;
 
     public TriggersPredicate(long noLaterThanWithTimeWindow,
             TriggerState state) {
 
         this.noLaterThanWithTimeWindow = noLaterThanWithTimeWindow;
-        this.state = state;
+        this.noState = state;
     }
 
     public TriggersPredicate(long noLaterThanWithTimeWindow) {
@@ -1150,6 +1155,6 @@ class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
         }
 
         return entry.getValue().getNextFireTime() <= noLaterThanWithTimeWindow
-                && entry.getValue().getState() != state;
+                && entry.getValue().getState() != noState;
     }
 }
