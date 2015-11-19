@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 import static com.flaviof.quart.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
+import com.hazelcast.core.Hazelcast;
 
 /**
  *
@@ -100,7 +101,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     this.schedSignaler = signaler;
 
+    if (hazelcastClient == null) {
+      LOG.warn("Starting new local hazelcast client since not hazelcast instance setted before starting scheduler.");
+      hazelcastClient = Hazelcast.newHazelcastInstance();
+    }
+
     // initializing hazelcast maps
+    LOG.debug("Initializing hazelcast maps...");
     jobsByKey = hazelcastClient.getMap(HC_JOB_STORE_MAP_JOB);
     triggersByKey = hazelcastClient.getMap(HC_JOB_STORE_TRIGGER_BY_KEY_MAP);
     jobsByGroup = hazelcastClient.getMultiMap(HC_JOB_STORE_MAP_JOB_BY_GROUP_MAP);
@@ -119,6 +126,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     throws SchedulerException {
 
     LOG.info("Hazelcast Job Store started successfully");
+    schedulerRunning = true;
   }
 
   @Override
@@ -597,9 +605,10 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     triggersByKey.lock(triggerKey);
     try {
-      final TriggerWrapper newTrigger = newTriggerWrapper(
-          triggersByKey.get(triggerKey), NORMAL);
-      triggersByKey.put(newTrigger.key, newTrigger);
+      if (schedulerRunning) {
+        final TriggerWrapper newTrigger = newTriggerWrapper(triggersByKey.get(triggerKey), NORMAL);
+        triggersByKey.put(newTrigger.key, newTrigger);
+      }
     } finally {
       triggersByKey.unlock(triggerKey);
     }
