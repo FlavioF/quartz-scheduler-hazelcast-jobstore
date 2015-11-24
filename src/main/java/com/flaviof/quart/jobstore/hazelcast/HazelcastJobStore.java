@@ -619,8 +619,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     throws JobPersistenceException {
 
     List<String> pausedGroups = new LinkedList<>();
-    StringMatcher.StringOperatorName operator = matcher
-        .getCompareWithOperator();
+    StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
     switch (operator) {
     case EQUALS:
       if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
@@ -638,8 +637,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     }
 
     for (String pausedGroup : pausedGroups) {
-      Set<TriggerKey> keys = getTriggerKeys(GroupMatcher
-          .triggerGroupEquals(pausedGroup));
+      Set<TriggerKey> keys = getTriggerKeys(GroupMatcher.triggerGroupEquals(pausedGroup));
       for (TriggerKey key : keys) {
         pauseTrigger(key);
       }
