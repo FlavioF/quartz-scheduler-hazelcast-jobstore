@@ -3,16 +3,23 @@ package com.flaviof.quartz;
 import com.flaviof.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
 import java.util.Properties;
+import org.joda.time.DateTime;
+import org.quartz.JobDetail;
 import org.quartz.Scheduler;
+import static org.quartz.Scheduler.DEFAULT_GROUP;
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import org.testng.annotations.BeforeMethod;
 
-public class QuartzTest {
+public class QuartzTest extends AbstractTest {
+
+  public static int jobExecs = 0;
 
   Scheduler scheduler;
 
@@ -22,7 +29,7 @@ public class QuartzTest {
 
     Config config = new Config();
     config.setProperty("hazelcast.logging.type", "slf4j");
-    HazelcastInstance hazelcastInstance = Hazelcast.newHazelcastInstance(config);
+    hazelcastInstance = Hazelcast.newHazelcastInstance(config);
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
 
     final Properties props = new Properties();
@@ -37,12 +44,61 @@ public class QuartzTest {
   }
 
   @AfterClass
-  public void tearDown() {
+  public void tearDown()
+    throws SchedulerException {
+
+    hazelcastInstance.shutdown();
+    scheduler.shutdown();
+  }
+
+  @BeforeMethod
+  public void cleanUp()
+    throws SchedulerException {
+
+    scheduler.clear();
+    MyJob.count = 0;
+    MyJob.jobKeys.clear();
 
   }
 
   @Test()
-  public void testAcquireNextTrigger()
+  public void testSchedule()
     throws Exception {
+
+    JobDetail job1 = buildJob("Job1", DEFAULT_GROUP, MyJob.class);
+    JobDetail job2 = buildJob("Job2", DEFAULT_GROUP, MyJob.class);
+    JobDetail job3 = buildJob("Job3", DEFAULT_GROUP, MyJob.class);
+
+    scheduler.scheduleJob(job1, buildTrigger("key1", DEFAULT_GROUP, job1, DateTime.now().plusMillis(100).getMillis()));
+    scheduler.scheduleJob(job2, buildTrigger("key2", DEFAULT_GROUP, job2, DateTime.now().plusMillis(2500).getMillis()));
+    scheduler.scheduleJob(job3, buildTrigger("key3", DEFAULT_GROUP, job3, DateTime.now().plusMillis(5000).getMillis()));
+
+    Thread.sleep(5500);
+    assertEquals(MyJob.count, 3);
+    assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
+    assertTrue(MyJob.jobKeys.contains(job2.getKey().getName()));
+    assertTrue(MyJob.jobKeys.contains(job3.getKey().getName()));
+
   }
+
+  @Test()
+  public void testScheduleAtSameTime()
+    throws Exception {
+
+    JobDetail job1 = buildJob("testScheduleAtSameTime1", DEFAULT_GROUP, MyJob.class);
+    JobDetail job2 = buildJob("testScheduleAtSameTime2", DEFAULT_GROUP, MyJob.class);
+    JobDetail job3 = buildJob("testScheduleAtSameTime3", DEFAULT_GROUP, MyJob.class);
+
+    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(100).getMillis()));
+    scheduler.scheduleJob(job2, buildTrigger("k22", DEFAULT_GROUP, job2, DateTime.now().plusMillis(100).getMillis()));
+    scheduler.scheduleJob(job3, buildTrigger("k23", DEFAULT_GROUP, job3, DateTime.now().plusMillis(100).getMillis()));
+
+    Thread.sleep(200);
+    assertEquals(MyJob.count, 3);
+    assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
+    assertTrue(MyJob.jobKeys.contains(job2.getKey().getName()));
+    assertTrue(MyJob.jobKeys.contains(job3.getKey().getName()));
+
+  }
+
 }

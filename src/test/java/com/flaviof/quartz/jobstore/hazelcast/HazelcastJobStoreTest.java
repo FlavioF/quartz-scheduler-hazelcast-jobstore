@@ -1,20 +1,17 @@
 package com.flaviof.quartz.jobstore.hazelcast;
 
-import com.flaviof.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.beust.jcommander.internal.Maps;
+import com.flaviof.quartz.AbstractTest;
 import com.google.common.collect.Lists;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.joda.time.DateTime;
 import org.quartz.Calendar;
 import org.quartz.DateBuilder;
-import org.quartz.Job;
 import org.quartz.JobBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
@@ -50,16 +47,11 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
-public class HazelcastJobStoreTest {
+public class HazelcastJobStoreTest extends AbstractTest {
 
   static final Logger LOG = LoggerFactory.getLogger(HazelcastJobStoreTest.class);
 
-  private HazelcastInstance hazelcastInstance;
-  private JobStore jobStore;
   private SampleSignaler fSignaler;
-  private int buildTriggerIndex = 0;
-  private int buildJobIndex = 0;
-
   private JobDetail jobDetail;
 
   @BeforeClass
@@ -1322,144 +1314,6 @@ public class HazelcastJobStoreTest {
     hzJobStore.setInstanceName(name);
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
     return hzJobStore;
-  }
-
-  private JobDetail buildJob() {
-
-    return buildJob("jobName" + buildJobIndex++, DEFAULT_GROUP);
-  }
-
-  private JobDetail buildJob(String jobName) {
-
-    return buildJob(jobName, DEFAULT_GROUP);
-  }
-
-  private JobDetail buildJob(String jobName, String grouName) {
-
-    JobDetail job = JobBuilder.newJob(Job.class).withIdentity(jobName, grouName).build();
-    return job;
-  }
-
-  private JobDetail storeJob(String jobName)
-    throws ObjectAlreadyExistsException, JobPersistenceException {
-
-    return storeJob(buildJob(jobName));
-  }
-
-  private JobDetail storeJob(JobDetail jobDetail)
-    throws ObjectAlreadyExistsException, JobPersistenceException {
-
-    this.jobStore.storeJob(jobDetail, false);
-    return (JobDetail) jobDetail;
-  }
-
-  private JobDetail buildAndStoreJob()
-    throws ObjectAlreadyExistsException,
-    JobPersistenceException {
-
-    JobDetail buildJob = buildJob();
-    this.jobStore.storeJob(buildJob, false);
-    return (JobDetail) buildJob;
-  }
-
-  private JobDetail buildAndStoreJobWithTrigger()
-    throws ObjectAlreadyExistsException, JobPersistenceException {
-
-    JobDetail buildJob = buildJob();
-    this.jobStore.storeJob(buildJob, false);
-
-    OperableTrigger trigger = buildTrigger(buildJob);
-    jobStore.storeTrigger((OperableTrigger) trigger, false);
-
-    return buildJob;
-  }
-
-  private JobDetail retrieveJob(String jobName)
-    throws JobPersistenceException {
-
-    return this.jobStore.retrieveJob(new JobKey(jobName, DEFAULT_GROUP));
-  }
-
-  private OperableTrigger buildTrigger(String triggerName,
-      String triggerGroup,
-      JobDetail job,
-      Long startAt,
-      Long endAt) {
-
-    SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
-    return (OperableTrigger) TriggerBuilder
-        .newTrigger()
-        .withIdentity(triggerName, triggerGroup)
-        .forJob(job)
-        .startAt(startAt != null ? new Date(startAt) : null)
-        .endAt(endAt != null ? new Date(endAt) : null)
-        .withSchedule(schedule)
-        .build();
-  }
-
-  private OperableTrigger buildTrigger(String triggerName, String triggerGroup, JobDetail job, Long startAt) {
-
-    return buildTrigger(triggerName, triggerGroup, job, startAt, null);
-  }
-
-  private OperableTrigger buildTrigger()
-    throws ObjectAlreadyExistsException,
-    JobPersistenceException {
-
-    return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, buildAndStoreJob());
-  }
-
-  private OperableTrigger buildTrigger(String triggerName, String groupName)
-    throws JobPersistenceException {
-
-    return buildTrigger(triggerName, groupName, buildAndStoreJob());
-  }
-
-  private OperableTrigger buildTrigger(JobDetail jobDetail) {
-
-    return buildTrigger("triggerName" + buildTriggerIndex++, DEFAULT_GROUP, jobDetail);
-  }
-
-  private OperableTrigger buildTrigger(String triggerName, String groupName, JobDetail jobDetail) {
-
-    return buildTrigger(triggerName, groupName, jobDetail, DateTime.now().getMillis());
-  }
-
-  private OperableTrigger buildAndComputeTrigger(String triggerName, String triggerGroup, JobDetail job, Long startAt) {
-
-    return buildAndComputeTrigger(triggerName, triggerGroup, job, startAt, null);
-  }
-
-  private OperableTrigger buildAndComputeTrigger(String triggerName,
-      String triggerGroup,
-      JobDetail job,
-      Long startAt,
-      Long endAt) {
-
-    OperableTrigger trigger = buildTrigger(triggerName, triggerGroup, job, startAt, endAt);
-    trigger.computeFirstFireTime(null);
-    return trigger;
-  }
-
-  private OperableTrigger buildAndStoreTrigger()
-    throws ObjectAlreadyExistsException,
-    JobPersistenceException {
-
-    OperableTrigger trigger = buildTrigger();
-    jobStore.storeTrigger(trigger, false);
-    return trigger;
-  }
-
-  private OperableTrigger retrieveTrigger(TriggerKey triggerKey)
-    throws JobPersistenceException {
-
-    return jobStore.retrieveTrigger(triggerKey);
-  }
-
-  private void storeCalendar(String calName)
-    throws ObjectAlreadyExistsException, JobPersistenceException {
-
-    jobStore.storeCalendar(calName, new BaseCalendar(), false, false);
   }
 
 }
