@@ -1,4 +1,4 @@
-package com.flaviof.quart.jobstore.hazelcast;
+package com.flaviof.quartz.jobstore.hazelcast;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
@@ -18,13 +18,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerState.ACQUIRED;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerState.BLOCKED;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerState.NORMAL;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerState.PAUSED;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerState.STATE_COMPLETED;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerState.WAITING;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerState.toClassicTriggerState;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerState.ACQUIRED;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerState.BLOCKED;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerState.NORMAL;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerState.PAUSED;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerState.STATE_COMPLETED;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerState.WAITING;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerState.toClassicTriggerState;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Calendar;
@@ -48,7 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
-import static com.flaviof.quart.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
+import static com.flaviof.quartz.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
 import com.hazelcast.core.Hazelcast;
 import java.util.concurrent.TimeUnit;
 

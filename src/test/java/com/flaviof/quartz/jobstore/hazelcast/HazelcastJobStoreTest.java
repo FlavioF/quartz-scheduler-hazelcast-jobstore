@@ -1,5 +1,6 @@
-package com.flaviof.quart.jobstore.hazelcast;
+package com.flaviof.quartz.jobstore.hazelcast;
 
+import com.flaviof.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.beust.jcommander.internal.Maps;
 import com.google.common.collect.Lists;
 import com.hazelcast.config.Config;

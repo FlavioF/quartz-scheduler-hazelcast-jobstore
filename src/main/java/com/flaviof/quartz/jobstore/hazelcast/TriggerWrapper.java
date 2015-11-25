@@ -1,4 +1,4 @@
-package com.flaviof.quart.jobstore.hazelcast;
+package com.flaviof.quartz.jobstore.hazelcast;
 
 import java.io.Serializable;
 import java.util.Date;

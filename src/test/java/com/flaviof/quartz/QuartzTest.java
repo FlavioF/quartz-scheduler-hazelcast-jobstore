@@ -1,5 +1,6 @@
-package com.flaviof.quart.jobstore.hazelcast;
+package com.flaviof.quartz;
 
+import com.flaviof.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
@@ -43,6 +44,5 @@ public class QuartzTest {
   @Test()
   public void testAcquireNextTrigger()
     throws Exception {
-
   }
 }

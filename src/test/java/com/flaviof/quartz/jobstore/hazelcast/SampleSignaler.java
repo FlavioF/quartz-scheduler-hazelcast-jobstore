@@ -1,10 +1,10 @@
-package com.flaviof.quart.jobstore.hazelcast;
+package com.flaviof.quartz.jobstore.hazelcast;
 
 import org.quartz.JobKey;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.spi.SchedulerSignaler;
-import static com.flaviof.quart.jobstore.hazelcast.HazelcastJobStoreTest.LOG;
+import static com.flaviof.quartz.jobstore.hazelcast.HazelcastJobStoreTest.LOG;
 
 public class SampleSignaler implements SchedulerSignaler {
 
