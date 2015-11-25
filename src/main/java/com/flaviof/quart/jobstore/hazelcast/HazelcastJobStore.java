@@ -50,6 +50,7 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 import static com.flaviof.quart.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
 import com.hazelcast.core.Hazelcast;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -187,12 +188,16 @@ public class HazelcastJobStore implements JobStore, Serializable {
       throw new ObjectAlreadyExistsException(newJob);
     }
 
-    jobsByKey.lock(newJobKey);
+    jobsByKey.lock(newJobKey, 2, TimeUnit.SECONDS);
     try {
       jobsByKey.put(newJobKey, newJob);
       jobsByGroup.put(newJobKey.getGroup(), newJobKey);
     } finally {
-      jobsByKey.unlock(newJobKey);
+      try {
+        jobsByKey.unlock(newJobKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
   }
 
@@ -242,12 +247,16 @@ public class HazelcastJobStore implements JobStore, Serializable {
         removeTrigger(trigger.getKey(), false);
       }
 
-      jobsByKey.lock(jobKey);
+      jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
       try {
         jobsByGroup.remove(jobKey.getGroup(), jobKey);
         removed = jobsByKey.remove(jobKey) != null;
       } finally {
-        jobsByKey.unlock(jobKey);
+        try {
+          jobsByKey.unlock(jobKey);
+        } catch (IllegalMonitorStateException ex) {
+          LOG.warn("Error unlocking since it is already released.", ex);
+        }
       }
     }
     return removed;
@@ -284,7 +293,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     final OperableTrigger newTrigger = (OperableTrigger) trigger.clone();
     final TriggerKey triggerKey = newTrigger.getKey();
 
-    triggersByKey.lock(triggerKey);
+    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
     try {
       boolean containsKey = triggersByKey.containsKey(triggerKey);
       if (containsKey && !replaceExisting) {
@@ -306,7 +315,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
       triggersByKey.put(newTriger.key, newTriger);
       triggersByGroup.put(triggerKey.getGroup(), triggerKey);
     } finally {
-      triggersByKey.unlock(triggerKey);
+      try {
+        triggersByKey.unlock(triggerKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
   }
 
@@ -572,13 +585,17 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void pauseTrigger(TriggerKey triggerKey)
     throws JobPersistenceException {
 
-    triggersByKey.lock(triggerKey);
+    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
     try {
       final TriggerWrapper newTrigger = newTriggerWrapper(
           triggersByKey.get(triggerKey), PAUSED);
       triggersByKey.put(newTrigger.key, newTrigger);
     } finally {
-      triggersByKey.unlock(triggerKey);
+      try {
+        triggersByKey.unlock(triggerKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
   }
 
@@ -586,7 +603,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public org.quartz.Trigger.TriggerState getTriggerState(TriggerKey triggerKey)
     throws JobPersistenceException {
 
-    triggersByKey.lock(triggerKey);
+    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
     org.quartz.Trigger.TriggerState result = org.quartz.Trigger.TriggerState.NONE;
     try {
       TriggerWrapper tw = triggersByKey.get(triggerKey);
@@ -594,7 +611,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
         result = toClassicTriggerState(tw.getState());
       }
     } finally {
-      triggersByKey.unlock(triggerKey);
+      try {
+        triggersByKey.unlock(triggerKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
     return result;
   }
@@ -603,14 +624,18 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void resumeTrigger(TriggerKey triggerKey)
     throws JobPersistenceException {
 
-    triggersByKey.lock(triggerKey);
+    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
     try {
       if (schedulerRunning) {
         final TriggerWrapper newTrigger = newTriggerWrapper(triggersByKey.get(triggerKey), NORMAL);
         triggersByKey.put(newTrigger.key, newTrigger);
       }
     } finally {
-      triggersByKey.unlock(triggerKey);
+      try {
+        triggersByKey.unlock(triggerKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
   }
 
@@ -675,14 +700,18 @@ public class HazelcastJobStore implements JobStore, Serializable {
     if (!found) {
       return;
     }
-    jobsByKey.lock(jobKey);
+    jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
     try {
       List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
       for (OperableTrigger trigger : triggersForJob) {
         pauseTrigger(trigger.getKey());
       }
     } finally {
-      jobsByKey.unlock(jobKey);
+      try {
+        jobsByKey.unlock(jobKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
   }
 
@@ -694,14 +723,18 @@ public class HazelcastJobStore implements JobStore, Serializable {
     if (!found) {
       return;
     }
-    jobsByKey.lock(jobKey);
+    jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
     try {
       List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
       for (OperableTrigger trigger : triggersForJob) {
         resumeTrigger(trigger.getKey());
       }
     } finally {
-      jobsByKey.unlock(jobKey);
+      try {
+        jobsByKey.unlock(jobKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
 
   }
@@ -936,11 +969,15 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void releaseAcquiredTrigger(OperableTrigger trigger) {
 
     TriggerKey triggerKey = trigger.getKey();
-    triggersByKey.lock(triggerKey);
+    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
     try {
       storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
     } finally {
-      triggersByKey.unlock(triggerKey);
+      try {
+        triggersByKey.unlock(triggerKey);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
 
   }
@@ -1021,12 +1058,16 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     if (jobDetail.isPersistJobDataAfterExecution()) {
       JobKey jobKey = jobDetail.getKey();
-      jobsByKey.lock(jobKey);
+      jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
       try {
         jobsByKey.put(jobKey, jobDetail);
         jobsByGroup.put(jobKey.getGroup(), jobKey);
       } finally {
-        jobsByKey.unlock(jobKey);
+        try {
+          jobsByKey.unlock(jobKey);
+        } catch (IllegalMonitorStateException ex) {
+          LOG.warn("Error unlocking since it is already released.", ex);
+        }
       }
     }
   }
@@ -1063,8 +1104,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     boolean removed = false;
 
     // remove from triggers by FQN map
-    triggersByKey.lock(key);
-    triggersByGroup.lock(key.getGroup());
+    triggersByKey.lock(key, 2, TimeUnit.SECONDS);
     try {
       final TriggerWrapper tw = triggersByKey.remove(key);
       removed = tw != null;
@@ -1083,8 +1123,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
         }
       }
     } finally {
-      triggersByKey.unlock(key);
-      triggersByGroup.unlock(key.getGroup());
+      try {
+        triggersByKey.unlock(key);
+      } catch (IllegalMonitorStateException ex) {
+        LOG.warn("Error unlocking since it is already released.", ex);
+      }
     }
 
     return removed;
