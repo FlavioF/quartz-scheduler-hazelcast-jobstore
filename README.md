@@ -41,10 +41,24 @@ mvn clean install
 
 ### How to Use HazelcastJobStore with Quartz
 ```
+// Setting Hazelcast Instance
+HazelcastJobStore.setHazelcastClient(hazelcastInstance);
+
+// Setting Hazelcast Job Store
 Properties props = new Properties();
 props.setProperty(StdSchedulerFactory.PROP_JOB_STORE_CLASS, HazelcastJobStore.class.getName());
 
 StdSchedulerFactory scheduler = new StdSchedulerFactory(props).getScheduler();
+
+// Starting Scheduler
+scheduler.start();
+
+// Scheduling job
+JobDetail job = JobBuilder.newJob(jobClass).withIdentity(jobName, grouName).build();
+Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, triggerGroup).forJob(job).startAt(new Date(startAt)).build();
+
+scheduler.scheduleJob(job, trigger);
+
 ```
 
 ### Notes
