@@ -55,7 +55,7 @@ import com.hazelcast.core.Hazelcast;
  *
  * @author Flavio Ferreira
  *
- *         Thank you for Antoine Méausoone for starting the work.
+ *         Thanks Antoine Méausoone for starting the work.
  */
 public class HazelcastJobStore implements JobStore, Serializable {
 
