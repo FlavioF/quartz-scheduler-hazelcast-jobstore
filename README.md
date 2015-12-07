@@ -1,6 +1,6 @@
 Quartz-Scheduler Hazelcast Job Store
 ====================================
-An implementation of a Quartz Scheduler JobStore using Hazelcast distributed Maps and Sets.
+An implementation of a Quartz Scheduler Job Store using Hazelcast distributed Maps and Sets.
 
 This implementation is based on [Ameausoone/quartz-hazelcast-jobstore](https://github.com/Ameausoone/quartz-hazelcast-jobstore).
 

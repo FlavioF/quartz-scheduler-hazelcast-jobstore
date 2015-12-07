@@ -217,7 +217,6 @@ public class HazelcastJobStoreTest extends AbstractTest {
     List<OperableTrigger> acquiredTriggers = jobStore.acquireNextTriggers(firstFireTime + 10000, 3, 1000L);
     assertEquals(3, acquiredTriggers.size());
 
-    // release all the triggers since there is no order ensurance
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
     jobStore.releaseAcquiredTrigger(trigger3);
@@ -225,7 +224,6 @@ public class HazelcastJobStoreTest extends AbstractTest {
     acquiredTriggers = jobStore.acquireNextTriggers(firstFireTime + 10000, 4, 1000L);
     assertEquals(4, acquiredTriggers.size());
 
-    // release all the triggers since there is no order ensurance
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
     jobStore.releaseAcquiredTrigger(trigger3);
