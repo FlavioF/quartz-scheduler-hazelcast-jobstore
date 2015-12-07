@@ -47,6 +47,7 @@ public class QuartzTest extends AbstractTest {
   public void tearDown()
     throws SchedulerException {
 
+    cleanUp();
     hazelcastInstance.shutdown();
     scheduler.shutdown();
   }
@@ -58,6 +59,7 @@ public class QuartzTest extends AbstractTest {
     scheduler.clear();
     MyJob.count = 0;
     MyJob.jobKeys.clear();
+    MyJob.triggerKeys.clear();
 
   }
 
@@ -99,6 +101,24 @@ public class QuartzTest extends AbstractTest {
     assertTrue(MyJob.jobKeys.contains(job2.getKey().getName()));
     assertTrue(MyJob.jobKeys.contains(job3.getKey().getName()));
 
+  }
+
+  @Test()
+  public void testScheduleOutOfOrder()
+    throws Exception {
+
+    JobDetail job1 = buildJob("Job1", DEFAULT_GROUP, MyJob.class);
+
+    scheduler.scheduleJob(job1, buildTrigger("key1", DEFAULT_GROUP, job1, DateTime.now().plusMillis(2000).getMillis()));
+    scheduler.scheduleJob(buildTrigger("key2", DEFAULT_GROUP, job1, DateTime.now().plusMillis(1000).getMillis()));
+    scheduler.scheduleJob(buildTrigger("key3", DEFAULT_GROUP, job1, DateTime.now().plusMillis(3000).getMillis()));
+
+    Thread.sleep(3200);
+
+    assertEquals(MyJob.count, 3);
+    assertEquals(MyJob.triggerKeys.poll(), "key2");
+    assertEquals(MyJob.triggerKeys.poll(), "key1");
+    assertEquals(MyJob.triggerKeys.poll(), "key3");
   }
 
 }
