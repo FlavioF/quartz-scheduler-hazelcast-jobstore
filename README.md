@@ -60,6 +60,3 @@ Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, triggerG
 scheduler.scheduleJob(job, trigger);
 
 ```
-
-### Notes
-- In Hazelcast Job Store neither FIFO or LIFO are supported
