@@ -221,7 +221,6 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
     jobStore.releaseAcquiredTrigger(trigger3);
-    jobStore.releaseAcquiredTrigger(trigger4);
 
     acquiredTriggers = jobStore.acquireNextTriggers(firstFireTime + 10000, 4, 1000L);
     assertEquals(4, acquiredTriggers.size());
@@ -1307,7 +1306,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     assertEquals(jobStore.getTriggerState(trigger1.getKey()), Trigger.TriggerState.NORMAL);
     jobStore.removeTrigger(trigger1.getKey());
   }
-
+  
   private HazelcastJobStore createJobStore(String name) {
 
     HazelcastJobStore hzJobStore = new HazelcastJobStore();

@@ -12,8 +12,9 @@
 package com.flaviof.quartz;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.Queue;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -21,14 +22,17 @@ import org.quartz.JobExecutionException;
 public final class MyJob implements Job, Serializable {
 
   public static int count = 0;
-  public static List<String> jobKeys = new ArrayList<>();
+  public static Queue<String> jobKeys = new LinkedList<>();
+  public static Queue<String> triggerKeys = new LinkedList<>();
 
   @Override
   public void execute(final JobExecutionContext jobCtx)
     throws JobExecutionException {
 
     jobKeys.add(jobCtx.getJobDetail().getKey().getName());
+    triggerKeys.add(jobCtx.getTrigger().getKey().getName());
     count++;
+    System.out.println("Processing Trigger " + jobCtx.getTrigger().getKey().getName() + " " + new Date());
   }
 
 }

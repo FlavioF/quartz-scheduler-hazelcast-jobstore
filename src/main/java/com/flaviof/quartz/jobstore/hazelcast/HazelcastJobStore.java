@@ -11,7 +11,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +49,7 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 import static com.flaviof.quartz.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
 import com.hazelcast.core.Hazelcast;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -76,11 +76,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private final String HC_JOB_STORE_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
   private final String HC_JOB_STORE_PAUSED_JOB_GROUPS = "job-paused-job-groups";
   private final String HC_JOB_CALENDAR_MAP = "job-calendar-map";
+  private final String HC_JOB_STORE_TRIGGERS_QUEUE = "job-triggers-queue";
 
   private SchedulerSignaler schedSignaler;
 
   private IMap<JobKey, JobDetail> jobsByKey;
   private IMap<TriggerKey, TriggerWrapper> triggersByKey;
+  private BlockingQueue<TriggerKey> triggers;
   private MultiMap<String, JobKey> jobsByGroup;
   private MultiMap<String, TriggerKey> triggersByGroup;
   private IMap<String, Calendar> calendarsByName;
@@ -116,6 +118,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     pausedTriggerGroups = hazelcastClient.getSet(HC_JOB_STORE_PAUSED_TRIGGER_GROUPS);
     pausedJobGroups = hazelcastClient.getSet(HC_JOB_STORE_PAUSED_JOB_GROUPS);
     calendarsByName = hazelcastClient.getMap(HC_JOB_CALENDAR_MAP);
+    triggers = hazelcastClient.getQueue(HC_JOB_STORE_TRIGGERS_QUEUE);
 
     triggersByKey.addIndex("nextFireTime", true);
 
@@ -313,6 +316,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
       final TriggerWrapper newTriger = newTriggerWrapper(newTrigger, state);
       triggersByKey.put(newTriger.key, newTriger);
+      triggers.add(newTriger.key);
       triggersByGroup.put(triggerKey.getGroup(), triggerKey);
     } finally {
       try {
@@ -373,6 +377,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public boolean checkExists(TriggerKey triggerKey)
     throws JobPersistenceException {
 
+    triggers.contains(triggerKey);
     return triggersByKey.containsKey(triggerKey);
   }
 
@@ -401,6 +406,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
     for (final String calName : calendarsByName.keySet()) {
       removeCalendar(calName);
     }
+    
+    triggers.clear();
   }
 
   @Override
@@ -832,26 +839,28 @@ public class HazelcastJobStore implements JobStore, Serializable {
       int maxCount, long timeWindow)
     throws JobPersistenceException {
 
-    if (triggersByKey.isEmpty()) {
-      return Collections.EMPTY_LIST;
-    }
-
-    long limit = noLaterThan + timeWindow;
-    Collection<TriggerWrapper> triggers = triggersByKey.values(new TriggersPredicate(limit));
-
     if (triggers.isEmpty()) {
       return Collections.EMPTY_LIST;
     }
 
+    //    triggers.isEmpty();
+
+    long limit = noLaterThan + timeWindow;
+    final int size = triggers.size();
+
+    //    if (triggers.isEmpty()) {
+    //      return Collections.EMPTY_LIST;
+    //    }
+
     List<OperableTrigger> result = new ArrayList<>();
     Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<>();
-    Set<TriggerWrapper> excludedTriggers = new HashSet<>();
+    Set<TriggerKey> excludedTriggers = new HashSet<>();
 
-    Iterator<TriggerWrapper> iterator = triggers.iterator();
-    while (true) {
+    for (int i = 0; i < size; i++) {
       TriggerWrapper tw;
       try {
-        tw = iterator.next();
+        //        tw = iterator.next();
+        tw = triggersByKey.get(triggers.poll());
         if (tw == null) {
           break;
         }
@@ -861,6 +870,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       }
 
       if (tw.trigger.getNextFireTime() == null) {
+        triggers.add(tw.key);
         continue;
       }
 
@@ -873,7 +883,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
       if (tw.getTrigger().getNextFireTime().getTime() > limit) {
         storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
-        break;
+        continue;
       }
 
       // If trigger's job is set as @DisallowConcurrentExecution, and it has
@@ -884,7 +894,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       final JobDetail job = jobsByKey.get(tw.trigger.getJobKey());
       if (job.isConcurrentExectionDisallowed()) {
         if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
-          excludedTriggers.add(tw);
+          excludedTriggers.add(tw.key);
           continue; // go to next trigger in store.
         } else {
           acquiredJobKeysForNoConcurrentExec.add(jobKey);
@@ -1135,6 +1145,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   private void storeTriggerWrapper(final TriggerWrapper tw) {
 
+    if (tw.getState() == NORMAL || tw.getState() == WAITING) {
+      triggers.add(tw.key);
+    }
     triggersByKey.put(tw.key, tw);
   }
 
