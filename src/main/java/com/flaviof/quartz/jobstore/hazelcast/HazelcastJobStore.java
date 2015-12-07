@@ -48,7 +48,6 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 import static com.flaviof.quartz.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
-import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -59,7 +58,7 @@ import java.util.concurrent.TimeUnit;
  *
  *         Thanks Antoine Méausoone for starting the work.
  */
-public class HazelcastJobStore extends Config implements JobStore, Serializable {
+public class HazelcastJobStore implements JobStore, Serializable {
 
   private static final Logger LOG = LoggerFactory.getLogger(HazelcastJobStore.class);
 
