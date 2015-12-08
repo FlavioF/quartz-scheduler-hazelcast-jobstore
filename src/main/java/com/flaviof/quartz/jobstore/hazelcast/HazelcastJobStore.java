@@ -574,11 +574,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void pauseTrigger(TriggerKey triggerKey)
     throws JobPersistenceException {
 
-    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
+    triggersByKey.lock(triggerKey, 10, TimeUnit.SECONDS);
     try {
       final TriggerWrapper newTrigger = newTriggerWrapper(
           triggersByKey.get(triggerKey), PAUSED);
-      triggersByKey.put(newTrigger.key, newTrigger);
+      triggersByKey.put(triggerKey, newTrigger);
     } finally {
       try {
         triggersByKey.unlock(triggerKey);
@@ -833,56 +833,77 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     for (int i = 0; i < size; i++) {
       TriggerWrapper tw;
+      
       try {
         tw = triggers.poll();
         if (tw == null) {
           break;
         }
-        triggersByKey.remove(tw.key);
       } catch (java.util.NoSuchElementException nsee) {
         break;
       }
 
-      if (tw.trigger.getNextFireTime() == null) {
-        triggers.add(tw);
-        continue;
-      }
+      triggersByKey.lock(tw.key, 10, TimeUnit.SECONDS);
+      try {
+      
+        try {
+        triggersByKey.remove(tw.key);
+        } catch (java.util.NoSuchElementException nsee) {
+          break;
+        } 
+          
+        if(tw.getState() == PAUSED){
+          storeTriggerWrapper(tw);
+          continue;
+        }
 
-      if (applyMisfire(tw)) {
-        if (tw.trigger.getNextFireTime() != null) {
+        if (tw.trigger.getNextFireTime() == null) {
+          triggers.add(tw);
+          continue;
+        }
+
+        if (applyMisfire(tw)) {
+          if (tw.trigger.getNextFireTime() != null) {
+            storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
+          }
+          continue;
+        }
+
+        if (tw.getTrigger().getNextFireTime().getTime() > limit) {
           storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
+          continue;
         }
-        continue;
-      }
 
-      if (tw.getTrigger().getNextFireTime().getTime() > limit) {
-        storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
-        continue;
-      }
-
-      // If trigger's job is set as @DisallowConcurrentExecution, and it has
-      // already been added to result, then
-      // put it back into the timeTriggers set and continue to search for next
-      // trigger.
-      final JobKey jobKey = tw.trigger.getJobKey();
-      final JobDetail job = jobsByKey.get(tw.trigger.getJobKey());
-      if (job.isConcurrentExectionDisallowed()) {
-        if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
-          excludedTriggers.add(tw);
-          continue; // go to next trigger in store.
-        } else {
-          acquiredJobKeysForNoConcurrentExec.add(jobKey);
+        // If trigger's job is set as @DisallowConcurrentExecution, and it has
+        // already been added to result, then
+        // put it back into the timeTriggers set and continue to search for next
+        // trigger.
+        final JobKey jobKey = tw.trigger.getJobKey();
+        final JobDetail job = jobsByKey.get(tw.trigger.getJobKey());
+        if (job.isConcurrentExectionDisallowed()) {
+          if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
+            excludedTriggers.add(tw);
+            continue; // go to next trigger in store.
+          } else {
+            acquiredJobKeysForNoConcurrentExec.add(jobKey);
+          }
         }
-      }
 
-      OperableTrigger trig = (OperableTrigger) tw.trigger.clone();
-      trig.setFireInstanceId(getFiredTriggerRecordId());
-      storeTriggerWrapper(newTriggerWrapper(trig, ACQUIRED));
+        OperableTrigger trig = (OperableTrigger) tw.trigger.clone();
+        trig.setFireInstanceId(getFiredTriggerRecordId());
+        storeTriggerWrapper(newTriggerWrapper(trig, ACQUIRED));
 
-      result.add(trig);
+        result.add(trig);
 
-      if (result.size() == maxCount) {
-        break;
+        if (result.size() == maxCount) {
+          break;
+        }
+      } finally {
+        try {
+          triggersByKey.unlock(tw.key);
+        } catch (IllegalMonitorStateException ex) {
+          LOG.warn("Error unlocking since it is already released.", ex);
+        }
       }
     }
 
@@ -899,7 +920,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void releaseAcquiredTrigger(OperableTrigger trigger) {
 
     TriggerKey triggerKey = trigger.getKey();
-    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
+    triggersByKey.lock(triggerKey, 10, TimeUnit.SECONDS);
     try {
       storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
     } finally {
@@ -919,50 +940,65 @@ public class HazelcastJobStore implements JobStore, Serializable {
     List<TriggerFiredResult> results = new ArrayList<>();
 
     for (OperableTrigger trigger : firedTriggers) {
-      TriggerWrapper tw = triggersByKey.get(trigger.getKey());
-      // was the trigger deleted since being acquired?
-      if (tw == null || tw.trigger == null) {
-        continue;
-      }
-      // was the trigger completed, paused, blocked, etc. since being acquired?
-      if (tw.getState() != ACQUIRED) {
-        continue;
-      }
 
-      Calendar cal = null;
-      if (tw.trigger.getCalendarName() != null) {
-        cal = retrieveCalendar(tw.trigger.getCalendarName());
-        if (cal == null) {
+      triggersByKey.lock(trigger.getKey(), 10, TimeUnit.SECONDS);
+      try {
+        TriggerWrapper tw = triggersByKey.get(trigger.getKey());
+        // was the trigger deleted since being acquired?
+        if (tw == null || tw.trigger == null) {
           continue;
         }
-      }
-      Date prevFireTime = trigger.getPreviousFireTime();
-      // call triggered on our copy, and the scheduler's copy
-      tw.trigger.triggered(cal);
-      trigger.triggered(cal);
+        // was the trigger completed, paused, blocked, etc. since being acquired?
+        if (tw.getState() != ACQUIRED) {
+          continue;
+        }
 
-      storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
-
-      TriggerFiredBundle bndle = new TriggerFiredBundle(retrieveJob(tw.jobKey),
-          trigger, cal, false, new Date(), trigger.getPreviousFireTime(),
-          prevFireTime, trigger.getNextFireTime());
-
-      JobDetail job = bndle.getJobDetail();
-
-      if (job.isConcurrentExectionDisallowed()) {
-        ArrayList<TriggerWrapper> trigs = getTriggerWrappersForJob(job.getKey());
-        for (TriggerWrapper ttw : trigs) {
-          if (ttw.getState() == WAITING) {
-            ttw = newTriggerWrapper(ttw, BLOCKED);
-          }
-          if (ttw.getState() == PAUSED) {
-            ttw = newTriggerWrapper(ttw, BLOCKED);
+        Calendar cal = null;
+        if (tw.trigger.getCalendarName() != null) {
+          cal = retrieveCalendar(tw.trigger.getCalendarName());
+          if (cal == null) {
+            continue;
           }
         }
-      }
+        Date prevFireTime = trigger.getPreviousFireTime();
+        // call triggered on our copy, and the scheduler's copy
+        tw.trigger.triggered(cal);
+        trigger.triggered(cal);
+        System.out.println("Fired trigger changing state to waiting");
 
-      results.add(new TriggerFiredResult(bndle));
+        tw = newTriggerWrapper(trigger, WAITING);
+        storeTriggerWrapper(tw);
+
+        TriggerFiredBundle bndle = new TriggerFiredBundle(retrieveJob(tw.jobKey),
+            trigger, cal, false, new Date(), trigger.getPreviousFireTime(),
+            prevFireTime, trigger.getNextFireTime());
+
+        JobDetail job = bndle.getJobDetail();
+
+        if (job.isConcurrentExectionDisallowed()) {
+          ArrayList<TriggerWrapper> trigs = getTriggerWrappersForJob(job.getKey());
+          for (TriggerWrapper ttw : trigs) {
+            if (ttw.getState() == WAITING) {
+              ttw = newTriggerWrapper(ttw, BLOCKED);
+            }
+            if (ttw.getState() == PAUSED) {
+              ttw = newTriggerWrapper(ttw, BLOCKED);
+            }
+          }
+        } else if (tw.trigger.getNextFireTime() != null) {
+          triggers.add(tw);
+        }
+
+        results.add(new TriggerFiredResult(bndle));
+      } finally {
+        try {
+          triggersByKey.unlock(trigger.getKey());
+        } catch (IllegalMonitorStateException ex) {
+          LOG.warn("Error unlocking since it is already released.", ex);
+        }
+      }
     }
+   
     return results;
   }
 
@@ -1064,7 +1100,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     boolean removed = false;
 
     // remove from triggers by FQN map
-    triggersByKey.lock(key, 2, TimeUnit.SECONDS);
+    triggersByKey.lock(key, 10, TimeUnit.SECONDS);
     try {
       final TriggerWrapper tw = triggersByKey.remove(key);
       removed = tw != null;
