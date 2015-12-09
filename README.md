@@ -60,3 +60,4 @@ Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, triggerG
 scheduler.scheduleJob(job, trigger);
 
 ```
+[![Build Status](https://travis-ci.org/FlavioF/quartz-scheduler-hazelcast-jobstore.svg?branch=master)](https://travis-ci.org/FlavioF/quartz-scheduler-hazelcast-jobstore)
