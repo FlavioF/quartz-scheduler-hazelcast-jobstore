@@ -77,7 +77,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private final String HC_JOB_STORE_PAUSED_JOB_GROUPS = "job-paused-job-groups";
   private final String HC_JOB_CALENDAR_MAP = "job-calendar-map";
   private final String HC_JOB_STORE_TRIGGERS_QUEUE = "job-triggers-queue";
-  
+
   private static long ftrCtr = System.currentTimeMillis();
 
   private SchedulerSignaler schedSignaler;
@@ -190,7 +190,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       throw new ObjectAlreadyExistsException(newJob);
     }
 
-    jobsByKey.lock(newJobKey, 2, TimeUnit.SECONDS);
+    jobsByKey.lock(newJobKey, 5, TimeUnit.SECONDS);
     try {
       jobsByKey.put(newJobKey, newJob);
       jobsByGroup.put(newJobKey.getGroup(), newJobKey);
@@ -249,7 +249,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         removeTrigger(trigger.getKey(), false);
       }
 
-      jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
+      jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
       try {
         jobsByGroup.remove(jobKey.getGroup(), jobKey);
         removed = jobsByKey.remove(jobKey) != null;
@@ -294,7 +294,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     final OperableTrigger newTrigger = (OperableTrigger) trigger.clone();
     final TriggerKey triggerKey = newTrigger.getKey();
 
-    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
+    triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     try {
       boolean containsKey = triggersByKey.containsKey(triggerKey);
       if (containsKey && !replaceExisting) {
@@ -574,7 +574,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void pauseTrigger(TriggerKey triggerKey)
     throws JobPersistenceException {
 
-    triggersByKey.lock(triggerKey, 10, TimeUnit.SECONDS);
+    triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     try {
       final TriggerWrapper newTrigger = newTriggerWrapper(
           triggersByKey.get(triggerKey), PAUSED);
@@ -592,7 +592,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public org.quartz.Trigger.TriggerState getTriggerState(TriggerKey triggerKey)
     throws JobPersistenceException {
 
-    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
+    triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     org.quartz.Trigger.TriggerState result = org.quartz.Trigger.TriggerState.NONE;
     try {
       TriggerWrapper tw = triggersByKey.get(triggerKey);
@@ -613,7 +613,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void resumeTrigger(TriggerKey triggerKey)
     throws JobPersistenceException {
 
-    triggersByKey.lock(triggerKey, 2, TimeUnit.SECONDS);
+    triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     try {
       if (schedulerRunning) {
         final TriggerWrapper newTrigger = newTriggerWrapper(triggersByKey.get(triggerKey), NORMAL);
@@ -689,7 +689,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     if (!found) {
       return;
     }
-    jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
+    jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
     try {
       List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
       for (OperableTrigger trigger : triggersForJob) {
@@ -712,7 +712,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     if (!found) {
       return;
     }
-    jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
+    jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
     try {
       List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
       for (OperableTrigger trigger : triggersForJob) {
@@ -833,7 +833,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     for (int i = 0; i < size; i++) {
       TriggerWrapper tw;
-      
+
       try {
         tw = triggers.poll();
         if (tw == null) {
@@ -843,16 +843,16 @@ public class HazelcastJobStore implements JobStore, Serializable {
         break;
       }
 
-      triggersByKey.lock(tw.key, 10, TimeUnit.SECONDS);
+      triggersByKey.lock(tw.key, 5, TimeUnit.SECONDS);
       try {
-      
+
         try {
-        triggersByKey.remove(tw.key);
+          triggersByKey.remove(tw.key);
         } catch (java.util.NoSuchElementException nsee) {
           break;
-        } 
-          
-        if(tw.getState() == PAUSED){
+        }
+
+        if (tw.getState() == PAUSED) {
           storeTriggerWrapper(tw);
           continue;
         }
@@ -920,7 +920,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void releaseAcquiredTrigger(OperableTrigger trigger) {
 
     TriggerKey triggerKey = trigger.getKey();
-    triggersByKey.lock(triggerKey, 10, TimeUnit.SECONDS);
+    triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     try {
       storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
     } finally {
@@ -941,7 +941,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     for (OperableTrigger trigger : firedTriggers) {
 
-      triggersByKey.lock(trigger.getKey(), 10, TimeUnit.SECONDS);
+      triggersByKey.lock(trigger.getKey(), 5, TimeUnit.SECONDS);
       try {
         TriggerWrapper tw = triggersByKey.get(trigger.getKey());
         // was the trigger deleted since being acquired?
@@ -998,7 +998,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         }
       }
     }
-   
+
     return results;
   }
 
@@ -1010,7 +1010,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     if (jobDetail.isPersistJobDataAfterExecution()) {
       JobKey jobKey = jobDetail.getKey();
-      jobsByKey.lock(jobKey, 2, TimeUnit.SECONDS);
+      jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
       try {
         jobsByKey.put(jobKey, jobDetail);
         jobsByGroup.put(jobKey.getGroup(), jobKey);
@@ -1100,7 +1100,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     boolean removed = false;
 
     // remove from triggers by FQN map
-    triggersByKey.lock(key, 10, TimeUnit.SECONDS);
+    triggersByKey.lock(key, 5, TimeUnit.SECONDS);
     try {
       final TriggerWrapper tw = triggersByKey.remove(key);
       removed = tw != null;

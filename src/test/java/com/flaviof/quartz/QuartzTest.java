@@ -59,13 +59,13 @@ public class QuartzTest extends AbstractTest {
 
   @BeforeClass
   public void setUp()
-          throws SchedulerException, InterruptedException {
+    throws SchedulerException, InterruptedException {
 
   }
 
   @AfterClass
   public void tearDown()
-          throws SchedulerException {
+    throws SchedulerException {
 
     prepare();
     hazelcastInstance.shutdown();
@@ -74,7 +74,7 @@ public class QuartzTest extends AbstractTest {
 
   @BeforeMethod
   public void prepare()
-          throws SchedulerException {
+    throws SchedulerException {
 
     Config config = new Config();
     config.setProperty("hazelcast.logging.type", "slf4j");
@@ -91,23 +91,25 @@ public class QuartzTest extends AbstractTest {
     scheduler = new StdSchedulerFactory(props).getScheduler();
     scheduler.start();
 
+    MyJob.count = 0;
+    MyJob.jobKeys.clear();
+    MyJob.triggerKeys.clear();
+
   }
 
   @AfterMethod
   public void cleanUp()
-          throws SchedulerException {
+    throws SchedulerException {
+
     if (scheduler != null && scheduler.isStarted()) {
       scheduler.shutdown();
-      MyJob.count = 0;
-      MyJob.jobKeys.clear();
-      MyJob.triggerKeys.clear();
     }
 
   }
 
   @Test()
   public void testSchedule()
-          throws Exception {
+    throws Exception {
 
     JobDetail job1 = buildJob("Job1", DEFAULT_GROUP, MyJob.class);
     JobDetail job2 = buildJob("Job2", DEFAULT_GROUP, MyJob.class);
@@ -127,7 +129,7 @@ public class QuartzTest extends AbstractTest {
 
   @Test()
   public void testScheduleAtSameTime()
-          throws Exception {
+    throws Exception {
 
     JobDetail job1 = buildJob("testScheduleAtSameTime1", DEFAULT_GROUP, MyJob.class);
     JobDetail job2 = buildJob("testScheduleAtSameTime2", DEFAULT_GROUP, MyJob.class);
@@ -147,13 +149,16 @@ public class QuartzTest extends AbstractTest {
 
   @Test(invocationCount = 5)
   public void testScheduleOutOfOrder()
-          throws Exception {
+    throws Exception {
 
     JobDetail job1 = buildJob("Job1", DEFAULT_GROUP, MyJob.class);
 
     scheduler.scheduleJob(job1, buildTrigger("key1", DEFAULT_GROUP, job1, DateTime.now().plusMillis(200).getMillis()));
+    Thread.sleep(5);
     scheduler.scheduleJob(buildTrigger("key2", DEFAULT_GROUP, job1, DateTime.now().plusMillis(100).getMillis()));
+    Thread.sleep(5);
     scheduler.scheduleJob(buildTrigger("key3", DEFAULT_GROUP, job1, DateTime.now().plusMillis(300).getMillis()));
+    Thread.sleep(5);
 
     Thread.sleep(350);
 
@@ -163,21 +168,23 @@ public class QuartzTest extends AbstractTest {
     assertEquals(MyJob.triggerKeys.poll(), "key3");
   }
 
-  @Test
-  public void testBasicStorageFunctions() throws Exception {
+  @Test()
+  public void testBasicStorageFunctions()
+    throws Exception {
 
     // test basic storage functions of scheduler...
     JobDetail job = newJob()
-            .ofType(MyJob.class)
-            .withIdentity("j1")
-            .storeDurably()
-            .build();
+        .ofType(MyJob.class)
+        .withIdentity("j1")
+        .storeDurably()
+        .build();
 
     assertFalse("Unexpected existence of job named 'j1'.", scheduler.checkExists(jobKey("j1")));
 
     scheduler.addJob(job, false);
 
-    assertTrue("Expected existence of job named 'j1' but checkExists return false.", scheduler.checkExists(jobKey("j1")));
+    assertTrue("Expected existence of job named 'j1' but checkExists return false.",
+        scheduler.checkExists(jobKey("j1")));
 
     job = scheduler.getJobDetail(jobKey("j1"));
 
@@ -186,19 +193,22 @@ public class QuartzTest extends AbstractTest {
     scheduler.deleteJob(jobKey("j1"));
 
     Trigger trigger = newTrigger()
-            .withIdentity("t1")
-            .forJob(job)
-            .startNow()
-            .withSchedule(simpleSchedule()
-                    .repeatForever()
-                    .withIntervalInSeconds(5))
-            .build();
+        .withIdentity("t1")
+        .forJob(job)
+        .startNow()
+        .withSchedule(simpleSchedule()
+            .repeatForever()
+            .withIntervalInSeconds(5))
+        .build();
 
     assertFalse("Unexpected existence of trigger named '11'.", scheduler.checkExists(triggerKey("t1")));
 
     scheduler.scheduleJob(job, trigger);
+    //give time to hazelcast store the trigger
+    Thread.sleep(25);
 
-    assertTrue("Expected existence of trigger named 't1' but checkExists return false.", scheduler.checkExists(triggerKey("t1")));
+    assertTrue("Expected existence of trigger named 't1' but checkExists return false.",
+        scheduler.checkExists(triggerKey("t1")));
 
     job = scheduler.getJobDetail(jobKey("j1"));
 
@@ -209,36 +219,38 @@ public class QuartzTest extends AbstractTest {
     assertNotNull("Stored trigger not found!", trigger);
 
     job = newJob()
-            .ofType(MyJob.class)
-            .withIdentity("j2", "g1")
-            .build();
+        .ofType(MyJob.class)
+        .withIdentity("j2", "g1")
+        .build();
 
     trigger = newTrigger()
-            .withIdentity("t2", "g1")
-            .forJob(job)
-            .startNow()
-            .withSchedule(simpleSchedule()
-                    .repeatForever()
-                    .withIntervalInSeconds(5))
-            .build();
+        .withIdentity("t2", "g1")
+        .forJob(job)
+        .startNow()
+        .withSchedule(simpleSchedule()
+            .repeatForever()
+            .withIntervalInSeconds(5))
+        .build();
 
     scheduler.scheduleJob(job, trigger);
 
     job = newJob()
-            .ofType(MyJob.class)
-            .withIdentity("j3", "g1")
-            .build();
+        .ofType(MyJob.class)
+        .withIdentity("j3", "g1")
+        .build();
 
     trigger = newTrigger()
-            .withIdentity("t3", "g1")
-            .forJob(job)
-            .startNow()
-            .withSchedule(simpleSchedule()
-                    .repeatForever()
-                    .withIntervalInSeconds(5))
-            .build();
+        .withIdentity("t3", "g1")
+        .forJob(job)
+        .startNow()
+        .withSchedule(simpleSchedule()
+            .repeatForever()
+            .withIntervalInSeconds(5))
+        .build();
 
     scheduler.scheduleJob(job, trigger);
+    //give time to hazelcast store the trigger
+    Thread.sleep(25);
 
     List<String> jobGroups = scheduler.getJobGroupNames();
     List<String> triggerGroups = scheduler.getTriggerGroupNames();
@@ -263,8 +275,7 @@ public class QuartzTest extends AbstractTest {
 
     scheduler.pauseTrigger(triggerKey("t2", "g1"));
     s = scheduler.getTriggerState(triggerKey("t2", "g1"));
-    //TODO fix it
-//        assertEquals(s, Trigger.TriggerState.PAUSED);
+    assertEquals(s, Trigger.TriggerState.PAUSED);
 
     scheduler.resumeTrigger(triggerKey("t2", "g1"));
     s = scheduler.getTriggerState(triggerKey("t2", "g1"));
@@ -277,26 +288,28 @@ public class QuartzTest extends AbstractTest {
 
     // test that adding a trigger to a paused group causes the new trigger to be paused also... 
     job = newJob()
-            .ofType(MyJob.class)
-            .withIdentity("j4", "g1")
-            .build();
+        .ofType(MyJob.class)
+        .withIdentity("j4", "g1")
+        .build();
 
     trigger = newTrigger()
-            .withIdentity("t4", "g1")
-            .forJob(job)
-            .startNow()
-            .withSchedule(simpleSchedule()
-                    .repeatForever()
-                    .withIntervalInSeconds(5))
-            .build();
+        .withIdentity("t4", "g1")
+        .forJob(job)
+        .startNow()
+        .withSchedule(simpleSchedule()
+            .repeatForever()
+            .withIntervalInSeconds(5))
+        .build();
 
     scheduler.scheduleJob(job, trigger);
+    //give time to hazelcast store the trigger
+    Thread.sleep(25);
 
     pausedGroups = scheduler.getPausedTriggerGroups();
     assertTrue("Size of paused trigger groups list expected to be 1 ", pausedGroups.size() == 1);
-//TODO fix it
-//        s = scheduler.getTriggerState(triggerKey("t2", "g1"));
-//        assertEquals(s, Trigger.TriggerState.PAUSED);
+    //TODO fix it
+    //    s = scheduler.getTriggerState(triggerKey("t2", "g1"));
+    //    assertEquals(s, Trigger.TriggerState.PAUSED);
 
     s = scheduler.getTriggerState(triggerKey("t4", "g1"));
     assertEquals(s, Trigger.TriggerState.PAUSED);
@@ -309,9 +322,11 @@ public class QuartzTest extends AbstractTest {
     pausedGroups = scheduler.getPausedTriggerGroups();
     assertTrue("Size of paused trigger groups list expected to be 0 ", pausedGroups.size() == 0);
 
-    assertFalse("Scheduler should have returned 'false' from attempt to unschedule non-existing trigger. ", scheduler.unscheduleJob(triggerKey("foasldfksajdflk")));
+    assertFalse("Scheduler should have returned 'false' from attempt to unschedule non-existing trigger. ",
+        scheduler.unscheduleJob(triggerKey("foasldfksajdflk")));
 
-    assertTrue("Scheduler should have returned 'true' from attempt to unschedule existing trigger. ", scheduler.unscheduleJob(triggerKey("t3", "g1")));
+    assertTrue("Scheduler should have returned 'true' from attempt to unschedule existing trigger. ",
+        scheduler.unscheduleJob(triggerKey("t3", "g1")));
 
     jobKeys = scheduler.getJobKeys(GroupMatcher.jobGroupEquals("g1"));
     triggerKeys = scheduler.getTriggerKeys(GroupMatcher.triggerGroupEquals("g1"));
@@ -319,7 +334,8 @@ public class QuartzTest extends AbstractTest {
     assertTrue("Number of jobs expected in 'g1' group was 1 ", jobKeys.size() == 2); // job should have been deleted also, because it is non-durable
     assertTrue("Number of triggers expected in 'g1' group was 1 ", triggerKeys.size() == 2);
 
-    assertTrue("Scheduler should have returned 'true' from attempt to unschedule existing trigger. ", scheduler.unscheduleJob(triggerKey("t1")));
+    assertTrue("Scheduler should have returned 'true' from attempt to unschedule existing trigger. ",
+        scheduler.unscheduleJob(triggerKey("t1")));
 
     jobKeys = scheduler.getJobKeys(GroupMatcher.jobGroupEquals(JobKey.DEFAULT_GROUP));
     triggerKeys = scheduler.getTriggerKeys(GroupMatcher.triggerGroupEquals(TriggerKey.DEFAULT_GROUP));
@@ -330,14 +346,16 @@ public class QuartzTest extends AbstractTest {
   }
 
   @Test
-  public void testDurableStorageFunctions() throws Exception {
+  public void testDurableStorageFunctions()
+    throws Exception {
+
     // test basic storage functions of scheduler...
 
     JobDetail job = newJob()
-            .ofType(MyJob.class)
-            .withIdentity("j1")
-            .storeDurably()
-            .build();
+        .ofType(MyJob.class)
+        .withIdentity("j1")
+        .storeDurably()
+        .build();
 
     assertFalse("Unexpected existence of job named 'j1'.", scheduler.checkExists(jobKey("j1")));
 
@@ -346,9 +364,9 @@ public class QuartzTest extends AbstractTest {
     assertTrue("Unexpected non-existence of job named 'j1'.", scheduler.checkExists(jobKey("j1")));
 
     JobDetail nonDurableJob = newJob()
-            .ofType(MyJob.class)
-            .withIdentity("j2")
-            .build();
+        .ofType(MyJob.class)
+        .withIdentity("j2")
+        .build();
 
     try {
       scheduler.addJob(nonDurableJob, false);
@@ -363,7 +381,9 @@ public class QuartzTest extends AbstractTest {
   }
 
   @Test
-  public void testShutdownWithSleepReturnsAfterAllThreadsAreStopped() throws Exception {
+  public void testShutdownWithSleepReturnsAfterAllThreadsAreStopped()
+    throws Exception {
+
     Map<Thread, StackTraceElement[]> allThreadsStart = Thread.getAllStackTraces();
 
     Thread.sleep(500L);
@@ -396,18 +416,27 @@ public class QuartzTest extends AbstractTest {
     if (allThreadsEnd.size() > 0) {
       // log the additional threads
       for (Thread t : allThreadsEnd.keySet()) {
-        System.out.println("*** Found additional thread: " + t.getName() + " (of type " + t.getClass().getName() + ")  in group: " + t.getThreadGroup().getName() + " with parent group: " + (t.getThreadGroup().getParent() == null ? "-none-" : t.getThreadGroup().getParent().getName()));
+        System.out.println("*** Found additional thread: " + t.getName() + " (of type " + t.getClass().getName()
+            + ")  in group: " + t.getThreadGroup().getName() + " with parent group: "
+            + (t.getThreadGroup().getParent() == null ? "-none-" : t.getThreadGroup().getParent().getName()));
       }
       // log all threads that were running before shutdown
       for (Thread t : allThreadsRunning.keySet()) {
-        System.out.println("- Test runtime thread: " + t.getName() + " (of type " + t.getClass().getName() + ")  in group: " + (t.getThreadGroup() == null ? "-none-" : (t.getThreadGroup().getName() + " with parent group: " + (t.getThreadGroup().getParent() == null ? "-none-" : t.getThreadGroup().getParent().getName()))));
+        System.out.println("- Test runtime thread: "
+            + t.getName()
+            + " (of type "
+            + t.getClass().getName()
+            + ")  in group: "
+            + (t.getThreadGroup() == null ? "-none-" : (t.getThreadGroup().getName() + " with parent group: " + (t
+                .getThreadGroup().getParent() == null ? "-none-" : t.getThreadGroup().getParent().getName()))));
       }
     }
     assertTrue("Found unexpected new threads (see console output for listing)", allThreadsEnd.size() == 0);
   }
 
   @Test
-  public void testAbilityToFireImmediatelyWhenStartedBefore() throws Exception {
+  public void testAbilityToFireImmediatelyWhenStartedBefore()
+    throws Exception {
 
     List<Long> jobExecTimestamps = Collections.synchronizedList(new ArrayList<Long>());
     CyclicBarrier barrier = new CyclicBarrier(2);
@@ -429,11 +458,12 @@ public class QuartzTest extends AbstractTest {
 
     long fTime = jobExecTimestamps.get(0);
 
-    assertTrue("Immediate trigger did not fire within a reasonable amount of time.", (fTime - sTime < 7000L));  // This is dangerously subjective!  but what else to do?
+    assertTrue("Immediate trigger did not fire within a reasonable amount of time.", (fTime - sTime < 7000L)); // This is dangerously subjective!  but what else to do?
   }
 
   @Test
-  public void testAbilityToFireImmediatelyWhenStartedBeforeWithTriggerJob() throws Exception {
+  public void testAbilityToFireImmediatelyWhenStartedBeforeWithTriggerJob()
+    throws Exception {
 
     List<Long> jobExecTimestamps = Collections.synchronizedList(new ArrayList<Long>());
     CyclicBarrier barrier = new CyclicBarrier(2);
@@ -456,11 +486,12 @@ public class QuartzTest extends AbstractTest {
 
     long fTime = jobExecTimestamps.get(0);
 
-    assertTrue("Immediate trigger did not fire within a reasonable amount of time.", (fTime - sTime < 7000L));  // This is dangerously subjective!  but what else to do?
+    assertTrue("Immediate trigger did not fire within a reasonable amount of time.", (fTime - sTime < 7000L)); // This is dangerously subjective!  but what else to do?
   }
 
   @Test
-  public void testAbilityToFireImmediatelyWhenStartedAfter() throws Exception {
+  public void testAbilityToFireImmediatelyWhenStartedAfter()
+    throws Exception {
 
     List<Long> jobExecTimestamps = Collections.synchronizedList(new ArrayList<Long>());
     CyclicBarrier barrier = new CyclicBarrier(2);
@@ -480,27 +511,28 @@ public class QuartzTest extends AbstractTest {
 
     long fTime = jobExecTimestamps.get(0);
 
-    assertTrue("Immediate trigger did not fire within a reasonable amount of time.", (fTime - sTime < 7000L));  // This is dangerously subjective!  but what else to do?
+    assertTrue("Immediate trigger did not fire within a reasonable amount of time.", (fTime - sTime < 7000L)); // This is dangerously subjective!  but what else to do?
   }
 
   @Test
-  public void testScheduleMultipleTriggersForAJob() throws SchedulerException {
+  public void testScheduleMultipleTriggersForAJob()
+    throws SchedulerException {
 
     JobDetail job = newJob(MyJob.class).withIdentity("job1", "group1").build();
     Trigger trigger1 = newTrigger()
-            .withIdentity("trigger1", "group1")
-            .startNow()
-            .withSchedule(
-                    SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(1)
-                    .repeatForever())
-            .build();
+        .withIdentity("trigger1", "group1")
+        .startNow()
+        .withSchedule(
+            SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(1)
+                .repeatForever())
+        .build();
     Trigger trigger2 = newTrigger()
-            .withIdentity("trigger2", "group1")
-            .startNow()
-            .withSchedule(
-                    SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(1)
-                    .repeatForever())
-            .build();
+        .withIdentity("trigger2", "group1")
+        .startNow()
+        .withSchedule(
+            SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(1)
+                .repeatForever())
+        .build();
     Set<Trigger> triggersForJob = new HashSet<Trigger>();
     triggersForJob.add(trigger1);
     triggersForJob.add(trigger2);
@@ -515,7 +547,9 @@ public class QuartzTest extends AbstractTest {
   }
 
   @Test
-  public void testShutdownWithoutWaitIsUnclean() throws Exception {
+  public void testShutdownWithoutWaitIsUnclean()
+    throws Exception {
+
     CyclicBarrier barrier = new CyclicBarrier(2);
     try {
       scheduler.getContext().put(BARRIER, barrier);
@@ -538,7 +572,9 @@ public class QuartzTest extends AbstractTest {
   public static class UncleanShutdownJob implements Job {
 
     @Override
-    public void execute(JobExecutionContext context) throws JobExecutionException {
+    public void execute(JobExecutionContext context)
+      throws JobExecutionException {
+
       try {
         SchedulerContext schedulerContext = context.getScheduler().getContext();
         schedulerContext.put(JOB_THREAD, Thread.currentThread());
@@ -552,7 +588,8 @@ public class QuartzTest extends AbstractTest {
   }
 
   @Test
-  public void testShutdownWithWaitIsClean() throws Exception {
+  public void testShutdownWithWaitIsClean()
+    throws Exception {
 
     final AtomicBoolean shutdown = new AtomicBoolean(false);
     List<Long> jobExecTimestamps = Collections.synchronizedList(new ArrayList<Long>());
@@ -570,6 +607,7 @@ public class QuartzTest extends AbstractTest {
       Thread t = new Thread() {
         @Override
         public void run() {
+
           try {
             scheduler.shutdown(true);
             shutdown.set(true);
@@ -591,7 +629,7 @@ public class QuartzTest extends AbstractTest {
   public static class TestJobWithSync implements Job {
 
     public void execute(JobExecutionContext context)
-            throws JobExecutionException {
+      throws JobExecutionException {
 
       try {
         @SuppressWarnings("unchecked")
@@ -613,7 +651,8 @@ public class QuartzTest extends AbstractTest {
   public static class TestAnnotatedJob implements Job {
 
     public void execute(JobExecutionContext context)
-            throws JobExecutionException {
+      throws JobExecutionException {
+
     }
   }
 
