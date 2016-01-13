@@ -45,6 +45,7 @@ import static org.junit.Assert.fail;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import org.quartz.impl.triggers.SimpleTriggerImpl;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 
@@ -166,6 +167,23 @@ public class QuartzTest extends AbstractTest {
     assertEquals(MyJob.triggerKeys.poll(), "key2");
     assertEquals(MyJob.triggerKeys.poll(), "key1");
     assertEquals(MyJob.triggerKeys.poll(), "key3");
+  }
+
+  @Test()
+  public void testScheduleJobWithRepeatTime()
+    throws Exception {
+
+    JobDetail job1 = buildJob("Job1", DEFAULT_GROUP, MyJob.class);
+
+    final SimpleTriggerImpl o = (SimpleTriggerImpl) buildTrigger("key1", DEFAULT_GROUP, job1);
+    o.setRepeatInterval(100);
+    o.setRepeatCount(10);
+    
+    scheduler.scheduleJob(job1, o);
+    Thread.sleep(750);
+
+    assertEquals(MyJob.count, 8);
+    assertEquals(MyJob.triggerKeys.poll(), "key1");
   }
 
   @Test()

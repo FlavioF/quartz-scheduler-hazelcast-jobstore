@@ -964,10 +964,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
         // call triggered on our copy, and the scheduler's copy
         tw.trigger.triggered(cal);
         trigger.triggered(cal);
-        System.out.println("Fired trigger changing state to waiting");
 
         tw = newTriggerWrapper(trigger, WAITING);
-        storeTriggerWrapper(tw);
 
         TriggerFiredBundle bndle = new TriggerFiredBundle(retrieveJob(tw.jobKey),
             trigger, cal, false, new Date(), trigger.getPreviousFireTime(),
@@ -986,7 +984,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
             }
           }
         } else if (tw.trigger.getNextFireTime() != null) {
-          triggers.add(tw);
+          
+          storeTriggerWrapper(tw);
         }
 
         results.add(new TriggerFiredResult(bndle));
