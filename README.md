@@ -1,4 +1,4 @@
-Quartz-Scheduler Hazelcast Job Store
+Quartz-Scheduler Hazelcast Job Store [![Build Status](https://travis-ci.org/FlavioF/quartz-scheduler-hazelcast-jobstore.svg?branch=master)](https://travis-ci.org/FlavioF/quartz-scheduler-hazelcast-jobstore) [![](https://raw.githubusercontent.com/novoda/novoda/master/assets/btn_apache_lisence.png)](LICENSE.txt)
 ====================================
 An implementation of a Quartz Scheduler Job Store using Hazelcast distributed Maps and Sets.
 
@@ -60,4 +60,3 @@ Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, triggerG
 scheduler.scheduleJob(job, trigger);
 
 ```
-[![Build Status](https://travis-ci.org/FlavioF/quartz-scheduler-hazelcast-jobstore.svg?branch=master)](https://travis-ci.org/FlavioF/quartz-scheduler-hazelcast-jobstore)
