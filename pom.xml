@@ -104,5 +104,19 @@
             </plugin>
         </plugins>
     </build>
+    
+
+    <distributionManagement>
+      <repository>
+        <id>bikeemotion_mvn_central</id>
+        <name>Internal Releases</name>
+        <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+      </repository>
+      <snapshotRepository>
+        <id>bikeemotion_mvn_central</id>
+        <name>Internal Releases</name>
+        <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+      </snapshotRepository>
+    </distributionManagement>
 
 </project>
