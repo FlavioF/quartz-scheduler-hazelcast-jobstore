@@ -9,10 +9,7 @@
     <name>Quartz Hazelcast JobStore</name>
 
     <scm>
-
-        <connection>scm:git:https://github.com/Ameausoone/workspace.git</connection>
-        <developerConnection>scm:git:https://github.com/Ameausoone/workspace.git</developerConnection>
-        <url>https://github.com/hazelcast/hazelcast/</url>
+      <url>https://github.com/FlavioF/quartz-scheduler-hazelcast-jobstore/</url>
     </scm>
 
     <properties>
@@ -61,7 +58,6 @@
         </dependency>
     
         <!-- Utils -->
-
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
