@@ -1,7 +1,8 @@
-package com.flaviof.quartz.jobstore.hazelcast;
+package com.bikeemotion.quartz.jobstore.hazelcast;
 
+import com.bikeemotion.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.beust.jcommander.internal.Maps;
-import com.flaviof.quartz.AbstractTest;
+import com.bikeemotion.quartz.AbstractTest;
 import com.google.common.collect.Lists;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;

@@ -1,4 +1,4 @@
-package com.flaviof.quartz;
+package com.bikeemotion.quartz;
 
 import com.hazelcast.core.HazelcastInstance;
 import java.util.Date;

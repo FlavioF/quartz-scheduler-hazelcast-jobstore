@@ -1,6 +1,6 @@
-package com.flaviof.quartz;
+package com.bikeemotion.quartz;
 
-import com.flaviof.quartz.jobstore.hazelcast.HazelcastJobStore;
+import com.bikeemotion.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import java.util.ArrayList;

@@ -9,7 +9,7 @@
  * personnel only. Technical specifications and features are binding only when
  * specifically and expressly agreed upon in a written contract.
  */
-package com.flaviof.quartz;
+package com.bikeemotion.quartz;
 
 import java.io.Serializable;
 import java.util.Date;

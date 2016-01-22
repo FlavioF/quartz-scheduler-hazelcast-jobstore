@@ -1,4 +1,4 @@
-package com.flaviof.quartz.jobstore.hazelcast;
+package com.bikeemotion.quartz.jobstore.hazelcast;
 
 public enum TriggerState {
   NONE,
