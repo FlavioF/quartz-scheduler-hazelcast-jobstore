@@ -1,12 +1,11 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
 import java.io.Serializable;
-import java.util.Date;
 import org.quartz.JobKey;
 import org.quartz.TriggerKey;
 import org.quartz.spi.OperableTrigger;
 
-class TriggerWrapper implements Serializable {
+public class TriggerWrapper implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
