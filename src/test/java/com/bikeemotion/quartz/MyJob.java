@@ -15,11 +15,16 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.Queue;
+
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class MyJob implements Job, Serializable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(MyJob.class);
 
   public static int count = 0;
   public static Queue<String> jobKeys = new LinkedList<>();
@@ -32,7 +37,7 @@ public final class MyJob implements Job, Serializable {
     jobKeys.add(jobCtx.getJobDetail().getKey().getName());
     triggerKeys.add(jobCtx.getTrigger().getKey().getName());
     count++;
-    System.out.println("Processing Trigger " + jobCtx.getTrigger().getKey().getName() + " " + new Date());
+    LOG.info("Processing Trigger " + jobCtx.getTrigger().getKey().getName() + " " + new Date());
   }
 
 }
