@@ -1,5 +1,7 @@
 package com.bikeemotion.quartz;
 
+import com.hazelcast.config.Config;
+import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import java.util.Date;
 import org.joda.time.DateTime;
@@ -23,6 +25,13 @@ public abstract class AbstractTest {
   protected JobStore jobStore;
   protected int buildTriggerIndex = 0;
   protected int buildJobIndex = 0;
+
+  protected HazelcastInstance createHazelcastInstance() {
+
+    Config config = new Config();
+    config.setProperty("hazelcast.logging.type", "slf4j");
+    return Hazelcast.newHazelcastInstance(config);
+  }
 
   protected JobDetail buildJob() {
 

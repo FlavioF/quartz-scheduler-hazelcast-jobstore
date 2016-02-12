@@ -19,15 +19,15 @@ Hazelcast is an in-memory open source software data grid based on Java. By havin
 
 ### Adding Dependency
 ```
- <dependency>
+<dependency>
     <groupId>com.bikeemotion</groupId>
     <artifactId>quartz-hazelcast-jobstore</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
 ### Clustering
-When using Hazelcast Job Store we relay on Hazelcast to provide a Cluster where our jobs are stored. This way we can easly have a cluster of Quartz Scheduler instance that share the same data.
+When using Hazelcast Job Store we rely on Hazelcast to provide a Cluster where our jobs are stored. This way we can easily have a cluster of Quartz Scheduler instances that share the same data.
 
 ### Persisting Data
 Note that you can use Hazelcast MapStores to store all the data in your in-memory Maps in a datastore like Cassandra, Elasticsearch, PostgreSQL, etc (synchronously or asynchronously). Learn more about it [here](http://docs.hazelcast.org/docs/3.4/manual/html/map-persistence.html).

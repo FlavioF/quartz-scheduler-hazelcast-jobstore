@@ -97,6 +97,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   private String instanceId;
   private String instanceName;
+  private boolean shutdownHazelcastOnShutdown = true;
 
   public static final DateTimeFormatter FORMATTER = ISODateTimeFormat.basicDateTimeNoMillis();
 
@@ -153,7 +154,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public void shutdown() {
     
-    hazelcastClient.shutdown();
+    if (shutdownHazelcastOnShutdown) {
+      hazelcastClient.shutdown();
+    }
   }
 
   @Override
@@ -197,7 +200,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     jobsByKey.lock(newJobKey, 5, TimeUnit.SECONDS);
     try {
-      jobsByKey.put(newJobKey, newJob);
+      jobsByKey.set(newJobKey, newJob);
       jobsByGroup.put(newJobKey.getGroup(), newJobKey);
     } finally {
       try {
@@ -318,7 +321,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
           : NORMAL;
 
       final TriggerWrapper newTriger = newTriggerWrapper(newTrigger, state);
-      triggersByKey.put(newTriger.key, newTriger);
+      triggersByKey.set(newTriger.key, newTriger);
       triggers.add(newTriger);
       triggersByGroup.put(triggerKey.getGroup(), triggerKey);
     } finally {
@@ -407,7 +410,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       throw new ObjectAlreadyExistsException("Calendar with name '" + calName
           + "' already exists.");
     } else {
-      calendarsByName.put(calName, calendar);
+      calendarsByName.set(calName, calendar);
     }
   }
 
@@ -583,7 +586,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     try {
       final TriggerWrapper newTrigger = newTriggerWrapper(
           triggersByKey.get(triggerKey), PAUSED);
-      triggersByKey.put(triggerKey, newTrigger);
+      triggersByKey.set(triggerKey, newTrigger);
     } finally {
       try {
         triggersByKey.unlock(triggerKey);
@@ -622,7 +625,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     try {
       if (schedulerRunning) {
         final TriggerWrapper newTrigger = newTriggerWrapper(triggersByKey.get(triggerKey), NORMAL);
-        triggersByKey.put(newTrigger.key, newTrigger);
+        triggersByKey.set(newTrigger.key, newTrigger);
       }
     } finally {
       try {
@@ -1016,7 +1019,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       JobKey jobKey = jobDetail.getKey();
       jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
       try {
-        jobsByKey.put(jobKey, jobDetail);
+        jobsByKey.set(jobKey, jobDetail);
         jobsByGroup.put(jobKey.getGroup(), jobKey);
       } finally {
         try {
@@ -1038,6 +1041,16 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void setInstanceId(String instanceId) {
 
     this.instanceId = instanceId;
+  }
+
+  public void setShutdownHazelcastOnShutdown(boolean shutdownHazelcastOnShutdown) {
+
+    this.shutdownHazelcastOnShutdown = shutdownHazelcastOnShutdown;
+  }
+
+  public void setMisfireThreshold(long misfireThreshold) {
+
+    this.misfireThreshold = misfireThreshold;
   }
 
   @Override
@@ -1140,7 +1153,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     if (tw.getState() == NORMAL || tw.getState() == WAITING) {
       triggers.add(tw);
     }
-    triggersByKey.put(tw.key, tw);
+    triggersByKey.set(tw.key, tw);
   }
 
 }
