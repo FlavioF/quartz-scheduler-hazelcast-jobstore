@@ -1,29 +1,11 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
+import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.ISet;
 import com.hazelcast.core.MultiMap;
 import com.hazelcast.query.Predicate;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.stream.Collectors;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.ACQUIRED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.BLOCKED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.NORMAL;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.PAUSED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.STATE_COMPLETED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.WAITING;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.toClassicTriggerState;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Calendar;
@@ -45,12 +27,33 @@ import org.quartz.spi.TriggerFiredBundle;
 import org.quartz.spi.TriggerFiredResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Sets.newHashSet;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
-import com.hazelcast.core.Hazelcast;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.ACQUIRED;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.BLOCKED;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.NORMAL;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.PAUSED;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.STATE_COMPLETED;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.WAITING;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.toClassicTriggerState;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Sets.newHashSet;
+import static org.quartz.impl.matchers.StringMatcher.StringOperatorName.EQUALS;
 
 /**
  *
@@ -91,7 +94,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private ISet<String> pausedJobGroups;
   private volatile boolean schedulerRunning = false;
   private long misfireThreshold = 5000;
+
   private String instanceId;
+  private String instanceName;
 
   public static final DateTimeFormatter FORMATTER = ISODateTimeFormat.basicDateTimeNoMillis();
 
@@ -147,7 +152,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void shutdown() {
-
+    
     hazelcastClient.shutdown();
   }
 
@@ -1026,6 +1031,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public void setInstanceName(final String instanceName) {
 
+    this.instanceName = instanceName;
   }
 
   @Override
@@ -1106,6 +1112,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       if (removed) {
         // remove from triggers by group
         triggersByGroup.remove(key.getGroup(), key);
+        triggers.remove(tw);
 
         if (removeOrphanedJob) {
           JobDetail job = jobsByKey.get(tw.jobKey);

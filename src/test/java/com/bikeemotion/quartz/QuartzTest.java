@@ -3,6 +3,7 @@ package com.bikeemotion.quartz;
 import com.bikeemotion.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -13,42 +14,60 @@ import java.util.Set;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.joda.time.DateTime;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobBuilder;
+
 import static org.quartz.JobBuilder.newJob;
+
 import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.JobKey;
+
 import static org.quartz.JobKey.jobKey;
+
 import org.quartz.PersistJobDataAfterExecution;
 import org.quartz.Scheduler;
+
 import static org.quartz.Scheduler.DEFAULT_GROUP;
+
 import org.quartz.SchedulerContext;
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
+
 import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
+
 import static org.quartz.TriggerBuilder.newTrigger;
+
 import org.quartz.TriggerKey;
+
 import static org.quartz.TriggerKey.triggerKey;
+
 import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+
 import org.quartz.impl.triggers.SimpleTriggerImpl;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 
+import java.util.UUID;
+
+@Test(suiteName = "QuartzTest")
 public class QuartzTest extends AbstractTest {
 
   public static int jobExecs = 0;
@@ -79,6 +98,8 @@ public class QuartzTest extends AbstractTest {
 
     Config config = new Config();
     config.setProperty("hazelcast.logging.type", "slf4j");
+    config.getGroupConfig().setName(UUID.randomUUID().toString());
+    
     hazelcastInstance = Hazelcast.newHazelcastInstance(config);
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
 
@@ -125,6 +146,22 @@ public class QuartzTest extends AbstractTest {
     assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
     assertTrue(MyJob.jobKeys.contains(job2.getKey().getName()));
     assertTrue(MyJob.jobKeys.contains(job3.getKey().getName()));
+
+  }
+
+  @Test()
+  public void testScheduleDelete()
+    throws Exception {
+
+    JobDetail job1 = buildJob("testScheduleAtSameTime1", DEFAULT_GROUP, MyJob.class);
+
+    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(100).getMillis()));
+    scheduler.deleteJob(job1.getKey());
+    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(100).getMillis()));
+
+    Thread.sleep(150);
+    assertEquals(MyJob.count, 1);
+    assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
 
   }
 
@@ -178,7 +215,7 @@ public class QuartzTest extends AbstractTest {
     final SimpleTriggerImpl o = (SimpleTriggerImpl) buildTrigger("key1", DEFAULT_GROUP, job1);
     o.setRepeatInterval(100);
     o.setRepeatCount(10);
-    
+
     scheduler.scheduleJob(job1, o);
     Thread.sleep(750);
 
@@ -534,7 +571,7 @@ public class QuartzTest extends AbstractTest {
 
   @Test
   public void testScheduleMultipleTriggersForAJob()
-    throws SchedulerException {
+    throws Exception {
 
     JobDetail job = newJob(MyJob.class).withIdentity("job1", "group1").build();
     Trigger trigger1 = newTrigger()
@@ -556,6 +593,8 @@ public class QuartzTest extends AbstractTest {
     triggersForJob.add(trigger2);
 
     scheduler.scheduleJob(job, triggersForJob, true);
+
+    Thread.sleep(50);
 
     List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(job.getKey());
     assertEquals(2, triggersOfJob.size());
