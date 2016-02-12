@@ -1,15 +1,27 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-  
+
+    <parent>
+      <groupId>com.bikeemotion</groupId>
+      <artifactId>oss-parent</artifactId>
+      <version>1.0.1</version>
+    </parent>
+
     <groupId>com.bikeemotion</groupId>
     <artifactId>quartz-hazelcast-jobstore</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.2-SNAPSHOT</version>
   
     <name>Quartz Hazelcast JobStore</name>
 
+    <issueManagement>
+      <url>https://github.com/FlavioF/quartz-scheduler-hazelcast-jobstore/issues</url>
+      <system>GitHub Issues</system>
+    </issueManagement>
+
     <scm>
       <url>https://github.com/FlavioF/quartz-scheduler-hazelcast-jobstore/</url>
+      <connection>scm:git:git://github.com/FlavioF/quartz-scheduler-hazelcast-jobstore.git</connection>
+      <developerConnection>scm:git:git://github.com/FlavioF/quartz-scheduler-hazelcast-jobstore.git</developerConnection>
     </scm>
 
     <properties>
@@ -22,9 +34,7 @@
         <quartz.version>2.2.1</quartz.version>
         <guava.version>17.0</guava.version>
         <joda.time.version>2.4</joda.time.version>
-        <slf4j.version>1.6.2</slf4j.version>
     
-        <testng.version>6.8.8</testng.version>
     </properties>
 
     <dependencies>
@@ -54,7 +64,6 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>${slf4j.version}</version>
         </dependency>
     
         <!-- Utils -->
@@ -73,7 +82,6 @@
         <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
-            <version>${testng.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -91,7 +99,6 @@
         <dependency>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-log4j12</artifactId>
-          <version>1.6.2</version>
           <scope>test</scope>
         </dependency>
     </dependencies>
@@ -110,19 +117,5 @@
             </plugin>
         </plugins>
     </build>
-    
-
-    <distributionManagement>
-      <repository>
-        <id>bikeemotion_mvn_central</id>
-        <name>Internal Releases</name>
-        <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-      </repository>
-      <snapshotRepository>
-        <id>bikeemotion_mvn_central</id>
-        <name>Internal Releases</name>
-        <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-      </snapshotRepository>
-    </distributionManagement>
 
 </project>
