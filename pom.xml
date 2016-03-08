@@ -10,6 +10,7 @@
     <groupId>com.bikeemotion</groupId>
     <artifactId>quartz-hazelcast-jobstore</artifactId>
     <version>1.0.2-SNAPSHOT</version>
+    <packaging>bundle</packaging>
   
     <name>Quartz Hazelcast JobStore</name>
 
@@ -35,6 +36,8 @@
         <guava.version>17.0</guava.version>
         <joda.time.version>2.4</joda.time.version>
     
+        <osgi.import.pkg>*</osgi.import.pkg>
+        <osgi.export.pkg>com.bikeemotion.quartz.jobstore.*</osgi.export.pkg>
     </properties>
 
     <dependencies>
