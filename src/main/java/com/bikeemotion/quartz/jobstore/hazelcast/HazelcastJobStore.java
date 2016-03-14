@@ -97,6 +97,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   private String instanceId;
   private String instanceName;
+  private boolean shutdownHazelcastOnShutdown = true;
 
   public static final DateTimeFormatter FORMATTER = ISODateTimeFormat.basicDateTimeNoMillis();
 
@@ -153,7 +154,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
   @Override
   public void shutdown() {
     
-    hazelcastClient.shutdown();
+    if (shutdownHazelcastOnShutdown) {
+      hazelcastClient.shutdown();
+    }
   }
 
   @Override
@@ -1038,6 +1041,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void setInstanceId(String instanceId) {
 
     this.instanceId = instanceId;
+  }
+
+  public void setShutdownHazelcastOnShutdown(boolean shutdownHazelcastOnShutdown) {
+
+    this.shutdownHazelcastOnShutdown = shutdownHazelcastOnShutdown;
   }
 
   @Override
