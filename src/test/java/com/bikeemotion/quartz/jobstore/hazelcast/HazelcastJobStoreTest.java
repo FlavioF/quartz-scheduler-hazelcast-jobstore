@@ -7,7 +7,6 @@ import com.google.common.collect.Lists;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
-
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -20,7 +19,6 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
 import org.quartz.ObjectAlreadyExistsException;
-
 import static org.quartz.Scheduler.DEFAULT_GROUP;
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
@@ -45,7 +43,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
-
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
