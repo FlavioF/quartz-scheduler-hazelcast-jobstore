@@ -1043,6 +1043,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
     this.instanceId = instanceId;
   }
 
+  public void setShutdownHazelcastOnShutdown(boolean shutdownHazelcastOnShutdown) {
+
+    this.shutdownHazelcastOnShutdown = shutdownHazelcastOnShutdown;
+  }
+
   @Override
   public void setThreadPoolSize(int poolSize) {
 
