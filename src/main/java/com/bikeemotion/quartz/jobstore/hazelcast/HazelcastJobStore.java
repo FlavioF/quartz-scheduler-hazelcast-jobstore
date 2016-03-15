@@ -1048,6 +1048,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
     this.shutdownHazelcastOnShutdown = shutdownHazelcastOnShutdown;
   }
 
+  public void setMisfireThreshold(long misfireThreshold) {
+
+    this.misfireThreshold = misfireThreshold;
+  }
+
   @Override
   public void setThreadPoolSize(int poolSize) {
 
