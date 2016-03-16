@@ -49,7 +49,7 @@ mvn clean install
 ```
 
 ### How to Use HazelcastJobStore with Quartz
-```
+```java
 // Setting Hazelcast Instance
 HazelcastJobStore.setHazelcastClient(hazelcastInstance);
 
@@ -67,5 +67,4 @@ JobDetail job = JobBuilder.newJob(jobClass).withIdentity(jobName, grouName).buil
 Trigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerName, triggerGroup).forJob(job).startAt(new Date(startAt)).build();
 
 scheduler.scheduleJob(job, trigger);
-
 ```
