@@ -1339,12 +1339,5 @@ public class HazelcastJobStoreTest extends AbstractTest {
     assertEquals(jobStore.getTriggerState(trigger1.getKey()), Trigger.TriggerState.NORMAL);
     jobStore.removeTrigger(trigger1.getKey());
   }
-  
-  private HazelcastJobStore createJobStore(String name) {
-
-    HazelcastJobStore hzJobStore = new HazelcastJobStore();
-    hzJobStore.setInstanceName(name);
-    return hzJobStore;
-  }
 
 }

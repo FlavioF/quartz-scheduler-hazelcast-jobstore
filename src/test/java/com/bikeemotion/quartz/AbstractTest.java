@@ -1,5 +1,6 @@
 package com.bikeemotion.quartz;
 
+import com.bikeemotion.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
@@ -31,6 +32,22 @@ public abstract class AbstractTest {
     Config config = new Config();
     config.setProperty("hazelcast.logging.type", "slf4j");
     return Hazelcast.newHazelcastInstance(config);
+  }
+
+  protected HazelcastInstance createMulticastEnabledHazelcastInstance(String clusterName) {
+
+    Config config = new Config();
+    config.getGroupConfig().setName(clusterName);
+    config.getGroupConfig().setPassword("some-password");
+    config.setProperty("hazelcast.logging.type", "slf4j");
+    return Hazelcast.newHazelcastInstance(config);
+  }
+
+  protected HazelcastJobStore createJobStore(String name) {
+
+    HazelcastJobStore hzJobStore = new HazelcastJobStore();
+    hzJobStore.setInstanceName(name);
+    return hzJobStore;
   }
 
   protected JobDetail buildJob() {
