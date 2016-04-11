@@ -87,9 +87,10 @@ public class QuartzTest extends AbstractTest {
   public void tearDown()
     throws SchedulerException {
 
-    prepare();
     hazelcastInstance.shutdown();
     scheduler.shutdown();
+    Hazelcast.shutdownAll();
+
   }
 
   @BeforeMethod
@@ -155,12 +156,11 @@ public class QuartzTest extends AbstractTest {
 
     JobDetail job1 = buildJob("testScheduleAtSameTime1", DEFAULT_GROUP, MyJob.class);
 
-    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(100).getMillis()));
-    scheduler.deleteJob(job1.getKey());
-    Thread.sleep(50);
-    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(100).getMillis()));
+    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150).getMillis()));
+    assertTrue(scheduler.deleteJob(job1.getKey()));
+    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150).getMillis()));
 
-    Thread.sleep(150);
+    Thread.sleep(160);
     assertEquals(MyJob.count, 1);
     assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
 

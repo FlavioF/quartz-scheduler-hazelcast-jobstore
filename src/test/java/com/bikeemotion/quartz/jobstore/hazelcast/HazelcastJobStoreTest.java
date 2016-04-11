@@ -1,17 +1,18 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
-import com.bikeemotion.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.beust.jcommander.internal.Maps;
 import com.bikeemotion.quartz.AbstractTest;
 import com.google.common.collect.Lists;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.quartz.Calendar;
 import org.quartz.DateBuilder;
 import org.quartz.JobBuilder;
@@ -19,7 +20,9 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
 import org.quartz.ObjectAlreadyExistsException;
+
 import static org.quartz.Scheduler.DEFAULT_GROUP;
+
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
@@ -43,6 +46,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+
+import java.util.UUID;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -70,6 +76,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
     loadHelper.initialize();
 
+    HazelcastJobStore.setHazelcastClient(hazelcastInstance);
     jobStore = createJobStore("AbstractJobStoreTest");
     jobStore.initialize(loadHelper, this.fSignaler);
     jobStore.schedulerStarted();
@@ -86,9 +93,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
   }
 
   @BeforeMethod
-  public void setUpBeforeEachTest() {
-    HazelcastJobStore.setHazelcastClient(hazelcastInstance);
-  }
+  public void setUpBeforeEachTest() {}
 
   @AfterMethod
   public void cleanUpAfterEachTest()
@@ -101,7 +106,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
   @Test()
   public void testShuttingDownWithShuttingDownHazelcast() throws SchedulerException {
 
-    HazelcastInstance hazelcastInstance = createHazelcastInstance();
+    HazelcastInstance hazelcastInstance = createHazelcastInstance(UUID.randomUUID().toString());
 
     HazelcastJobStore jobStore = createJobStore("test-shutting-down-hazelcast");
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
@@ -114,7 +119,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
   @Test()
   public void testShuttingDownWithoutShuttingDownHazelcast() throws SchedulerException {
 
-    HazelcastInstance hazelcastInstance = createHazelcastInstance();
+    HazelcastInstance hazelcastInstance = createHazelcastInstance(UUID.randomUUID().toString());
 
     HazelcastJobStore jobStore = createJobStore("test-shutting-down-hazelcast");
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
@@ -178,17 +183,19 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.storeTrigger(t1, false);
     jobStore.storeTrigger(t2, false);
 
-    assertEquals(jobStore.acquireNextTriggers(baseFireTime + 600, 1, 0L).size(), 1);
+    List<OperableTrigger> acquired = jobStore.acquireNextTriggers(baseFireTime + 600, 1, 0L);
+    assertEquals(acquired.size(), 1);
+    jobStore.triggersFired(acquired);
+    OperableTrigger acquiredTrigger = acquired.get(0);
 
     Thread.sleep(6000);
 
-    assertEquals(jobStore.acquireNextTriggers(DateBuilder.newDate().build().getTime() + 600, 1, 0L).size(), 0);
+    long now = DateBuilder.newDate().build().getTime();
+    assertEquals(jobStore.acquireNextTriggers(now + 600, 1, 0L).size(), 0);
 
     OperableTrigger missfiredTriger = jobStore.getTriggersForJob(job.getKey())
         .stream()
-        .filter(item
-            -> item.getNextFireTime().getTime() != t1.getNextFireTime().getTime()
-                && item.getNextFireTime().getTime() != t2.getNextFireTime().getTime())
+        .filter(item -> !item.getKey().getName().equals(acquiredTrigger.getKey().getName()))
         .findFirst()
         .get();
 
