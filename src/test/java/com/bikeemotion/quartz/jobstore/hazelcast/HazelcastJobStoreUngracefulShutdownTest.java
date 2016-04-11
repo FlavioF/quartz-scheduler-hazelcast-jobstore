@@ -14,7 +14,11 @@ import org.quartz.spi.OperableTrigger;
 import org.testng.annotations.Test;
 
 import com.bikeemotion.quartz.AbstractTest;
+import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import org.testng.annotations.AfterMethod;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Tests running {@link HazelcastJobStore} on two different nodes. If one node crashes during
@@ -34,26 +38,31 @@ import com.hazelcast.core.HazelcastInstance;
  */
 public class HazelcastJobStoreUngracefulShutdownTest extends AbstractTest {
 
-  @Test
+  @AfterMethod
+  public void tearDown() {
+    Hazelcast.shutdownAll();
+  }
+  
+  @Test()
   public void testOneOfTwoInstancesCrashing()
     throws Exception {
-
+  
     // Build node 1
-    HazelcastInstance hazelcast1 = createMulticastEnabledHazelcastInstance("testOneOfTwoInstancesCrashing");
+    HazelcastInstance hazelcast1 = createHazelcastInstance("testOneOfTwoInstancesCrashing");
     HazelcastJobStore.setHazelcastClient(hazelcast1);
     HazelcastJobStore jobstore1 = createJobStore("jobstore1");
     jobstore1.setShutdownHazelcastOnShutdown(false);
     jobstore1.initialize(null, new SampleSignaler());
 
     // Build node 2
-    HazelcastInstance hazelcast2 = createMulticastEnabledHazelcastInstance("testOneOfTwoInstancesCrashing");
+    HazelcastInstance hazelcast2 = createHazelcastInstance("testOneOfTwoInstancesCrashing");
     HazelcastJobStore.setHazelcastClient(hazelcast2);
     HazelcastJobStore jobstore2 = createJobStore("jobstore2");
     jobstore2.setShutdownHazelcastOnShutdown(false);
     jobstore2.initialize(null, new SampleSignaler());
 
     // Add a job and its trigger to the scheduler
-    JobDetail job = JobBuilder.newJob(TestJob.class).withIdentity("job1", "jobGroup1").build();
+    JobDetail job = JobBuilder.newJob(TestSlowJob.class).withIdentity("job1", "jobGroup1").build();
     OperableTrigger trigger = buildAndComputeTrigger("trigger1", "triggerGroup1", job, new Date().getTime());
     trigger.setMisfireInstruction(MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY);
     jobstore1.storeJobAndTrigger(job, (OperableTrigger) trigger);
@@ -74,14 +83,17 @@ public class HazelcastJobStoreUngracefulShutdownTest extends AbstractTest {
 
     // Start acquiring next triggers and right after start terminating Hazelcast
     acquireThread.start();
-    Thread.sleep(2);
+    long waitTime = ThreadLocalRandom.current().nextInt(1, 51);
+    Thread.sleep(waitTime);
     terminateThread.start();
 
     // Wait a bit
-    Thread.sleep(2000);
+    Thread.sleep(5500);
 
     // Acquire next triggers on node 2, we should get our trigger here!
     List<OperableTrigger> triggers2 = jobstore2.acquireNextTriggers(firstFireTime + 500, 1, 0L);
-    assertEquals(triggers2.size(), 1, "Should find 1 trigger on node 2 after node 1 crashed.");
+    assertEquals(triggers2.size(), 
+        1, 
+        "Should find 1 trigger on node 2 after node 1 crashed when failing after "+waitTime+"ms");
   }
 }

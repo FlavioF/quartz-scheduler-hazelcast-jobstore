@@ -9,6 +9,7 @@ import com.hazelcast.query.Predicate;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Calendar;
+import org.quartz.DateBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
@@ -840,10 +841,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
     Set<TriggerWrapper> excludedTriggers = new HashSet<>();
 
     for (int i = 0; i < size; i++) {
-      TriggerWrapper tw;
+      TriggerWrapper tw = null;
 
+      // take the next trigger from the queue
       try {
-        tw = triggers.poll();
+        tw = triggers.peek();
         if (tw == null) {
           break;
         }
@@ -851,34 +853,43 @@ public class HazelcastJobStore implements JobStore, Serializable {
         break;
       }
 
+      // lock the trigger and move it to the end, only if still in the head
+      triggersByKey.lock(tw.key, 3, TimeUnit.SECONDS);
+      try {
+        if (tw.equals(triggers.peek())) {
+          triggers.add(tw); // move to the tail of queue
+          triggers.poll(); // remove from head
+        } else {
+          continue; //moving on if already not in the head of the queue
+        }
+      } finally {
+        try {
+          triggersByKey.unlock(tw.key); // unlock to not block other JobStores
+        } catch (IllegalMonitorStateException ex) {
+          LOG.warn("Error unlocking since it is already released.", ex);
+        }
+      }
+      // proced after the other jobstore already not blocked
       triggersByKey.lock(tw.key, 5, TimeUnit.SECONDS);
       try {
 
-        try {
-          triggersByKey.remove(tw.key);
-        } catch (java.util.NoSuchElementException nsee) {
-          break;
-        }
-
         if (tw.getState() == PAUSED) {
-          storeTriggerWrapper(tw);
           continue;
         }
 
         if (tw.trigger.getNextFireTime() == null) {
-          triggers.add(tw);
           continue;
         }
 
         if (applyMisfire(tw)) {
           if (tw.trigger.getNextFireTime() != null) {
-            storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
+            replaceTriggerWrapper(tw, newTriggerWrapper(tw, NORMAL));
           }
           continue;
         }
 
         if (tw.getTrigger().getNextFireTime().getTime() > limit) {
-          storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
+          replaceTriggerWrapper(tw, newTriggerWrapper(tw, NORMAL));
           continue;
         }
 
@@ -890,8 +901,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
         final JobDetail job = jobsByKey.get(tw.trigger.getJobKey());
         if (job.isConcurrentExectionDisallowed()) {
           if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
+            triggers.remove(tw);
             excludedTriggers.add(tw);
-            continue; // go to next trigger in store.
+            continue; // go to next trigger in queue.
           } else {
             acquiredJobKeysForNoConcurrentExec.add(jobKey);
           }
@@ -899,7 +911,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
         OperableTrigger trig = (OperableTrigger) tw.trigger.clone();
         trig.setFireInstanceId(getFiredTriggerRecordId());
-        storeTriggerWrapper(newTriggerWrapper(trig, ACQUIRED));
+        replaceTriggerWrapper(tw, newTriggerWrapper(trig, ACQUIRED));
 
         result.add(trig);
 
@@ -930,7 +942,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     TriggerKey triggerKey = trigger.getKey();
     triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     try {
-      storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
+      replaceTriggerWrapper(triggersByKey.get(trigger.getKey()), newTriggerWrapper(trigger, WAITING));
     } finally {
       try {
         triggersByKey.unlock(triggerKey);
@@ -990,9 +1002,10 @@ public class HazelcastJobStore implements JobStore, Serializable {
             if (ttw.getState() == PAUSED) {
               ttw = newTriggerWrapper(ttw, BLOCKED);
             }
+            storeTriggerWrapper(ttw);
           }
         } else if (tw.trigger.getNextFireTime() != null) {
-          
+
           storeTriggerWrapper(tw);
         }
 
@@ -1063,11 +1076,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     ArrayList<TriggerWrapper> trigList = new ArrayList<>();
 
-    triggersByKey.values().stream().
-        filter((trigger) -> (trigger.jobKey.equals(jobKey))).
-        forEach((trigger) -> {
-          trigList.add(trigger);
-        });
+    triggersByKey.values().stream().filter((trigger) -> (trigger.jobKey.equals(jobKey))).forEach((trigger) -> {
+      trigList.add(trigger);
+    });
 
     return trigList;
   }
@@ -1075,12 +1086,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private boolean applyMisfire(TriggerWrapper tw)
     throws JobPersistenceException {
 
-    long misfireTime = System.currentTimeMillis();
+    long misfireTime = DateBuilder.newDate().build().getTime();
     if (misfireThreshold > 0) {
       misfireTime -= misfireThreshold;
     }
 
     Date tnft = tw.trigger.getNextFireTime();
+
     if (tnft == null
         || tnft.getTime() > misfireTime
         || tw.trigger.getMisfireInstruction() == Trigger.MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY) {
@@ -1098,8 +1110,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
     tw.trigger.updateAfterMisfire(cal);
 
     if (tw.trigger.getNextFireTime() == null) {
-      storeTriggerWrapper(newTriggerWrapper(tw, STATE_COMPLETED));
+      replaceTriggerWrapper(tw, newTriggerWrapper(tw, STATE_COMPLETED));
       schedSignaler.notifySchedulerListenersFinalized(tw.trigger);
+
     } else if (tnft.equals(tw.trigger.getNextFireTime())) {
       return false;
     }
@@ -1146,6 +1159,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
     }
 
     return removed;
+  }
+
+  private void replaceTriggerWrapper(final TriggerWrapper oldTW, final TriggerWrapper newTW) {
+
+    triggers.remove(oldTW);
+    storeTriggerWrapper(newTW);
+
   }
 
   private void storeTriggerWrapper(final TriggerWrapper tw) {

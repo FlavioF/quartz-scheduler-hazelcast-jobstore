@@ -4,7 +4,9 @@ import com.bikeemotion.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+
 import java.util.Date;
+
 import org.joda.time.DateTime;
 import org.quartz.Job;
 import org.quartz.JobBuilder;
@@ -12,13 +14,16 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
 import org.quartz.ObjectAlreadyExistsException;
+
 import static org.quartz.Scheduler.DEFAULT_GROUP;
+
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
 import org.quartz.impl.calendar.BaseCalendar;
 import org.quartz.spi.JobStore;
 import org.quartz.spi.OperableTrigger;
+
 
 public abstract class AbstractTest {
 
@@ -27,14 +32,7 @@ public abstract class AbstractTest {
   protected int buildTriggerIndex = 0;
   protected int buildJobIndex = 0;
 
-  protected HazelcastInstance createHazelcastInstance() {
-
-    Config config = new Config();
-    config.setProperty("hazelcast.logging.type", "slf4j");
-    return Hazelcast.newHazelcastInstance(config);
-  }
-
-  protected HazelcastInstance createMulticastEnabledHazelcastInstance(String clusterName) {
+  protected HazelcastInstance createHazelcastInstance(String clusterName) {
 
     Config config = new Config();
     config.getGroupConfig().setName(clusterName);

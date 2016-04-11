@@ -1,11 +1,18 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
 import java.io.Serializable;
+
 import org.quartz.JobKey;
 import org.quartz.TriggerKey;
 import org.quartz.spi.OperableTrigger;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 public class TriggerWrapper implements Serializable {
+  
+    private final static ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     private static final long serialVersionUID = 1L;
 
@@ -15,7 +22,7 @@ public class TriggerWrapper implements Serializable {
 
     public final OperableTrigger trigger;
 
-    private final TriggerState state;
+    private TriggerState state;
 
     public Long getNextFireTime() {
 
@@ -33,6 +40,11 @@ public class TriggerWrapper implements Serializable {
         key = trigger.getKey();
         this.jobKey = trigger.getJobKey();
         this.state = state;
+        
+        // Change to normal if acquired is not released in 5 seconds
+        if(state == TriggerState.ACQUIRED){
+         executor.schedule( () -> { acquiredToNormal(); }, 5, TimeUnit.SECONDS);
+        }
     }
 
     public static TriggerWrapper newTriggerWrapper(OperableTrigger trigger) {
@@ -51,6 +63,12 @@ public class TriggerWrapper implements Serializable {
 
         TriggerWrapper tw = new TriggerWrapper(trigger, state);
         return tw;
+    }
+    
+    private void acquiredToNormal(){
+      if(this.state==TriggerState.ACQUIRED){
+        this.state = TriggerState.NORMAL;
+      }
     }
 
     @Override
