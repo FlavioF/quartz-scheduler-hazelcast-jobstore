@@ -251,14 +251,14 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.storeTrigger(trigger5, false);
 
     List<OperableTrigger> acquiredTriggers = jobStore.acquireNextTriggers(baseFireTime + 1500, 3, 1000L);
-    assertEquals(3, acquiredTriggers.size());
+    assertEquals(acquiredTriggers.size(), 3);
 
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
     jobStore.releaseAcquiredTrigger(trigger3);
 
     acquiredTriggers = jobStore.acquireNextTriggers(baseFireTime + 1500, 4, 1000L);
-    assertEquals(4, acquiredTriggers.size());
+    assertEquals(acquiredTriggers.size(), 4);
 
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
@@ -266,18 +266,18 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.releaseAcquiredTrigger(trigger4);
 
     acquiredTriggers = jobStore.acquireNextTriggers(baseFireTime + 1500, 5, 1000L);
-    assertEquals(4, acquiredTriggers.size());
+    assertEquals(acquiredTriggers.size(), 4);
 
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
 
-    assertEquals(1, jobStore.acquireNextTriggers(baseFireTime + 2001, 5, 0L).size());
+    assertEquals(jobStore.acquireNextTriggers(baseFireTime + 2001, 5, 0L).size(), 1);
     jobStore.releaseAcquiredTrigger(trigger1);
 
-    assertEquals(2, jobStore.acquireNextTriggers(baseFireTime + 2000, 5, 150L).size());
+    assertEquals(jobStore.acquireNextTriggers(baseFireTime + 2000, 5, 150L).size(), 2);
     jobStore.releaseAcquiredTrigger(trigger1);
 
-    assertEquals(1, jobStore.acquireNextTriggers(baseFireTime + 2000, 5, 150L).size());
+    assertEquals(jobStore.acquireNextTriggers(baseFireTime + 2000, 5, 150L).size(), 1);
     jobStore.releaseAcquiredTrigger(trigger1);
 
     jobStore.removeTrigger(trigger1.getKey());
@@ -302,16 +302,16 @@ public class HazelcastJobStoreTest extends AbstractTest {
 
     trigger.computeFirstFireTime(null);
 
-    assertEquals(Trigger.TriggerState.NONE, jobStore.getTriggerState(trigger.getKey()));
+    assertEquals(jobStore.getTriggerState(trigger.getKey()), Trigger.TriggerState.NONE);
 
     jobStore.storeTrigger(trigger, false);
-    assertEquals(Trigger.TriggerState.NORMAL, jobStore.getTriggerState(trigger.getKey()));
+    assertEquals(jobStore.getTriggerState(trigger.getKey()), Trigger.TriggerState.NORMAL);
 
     jobStore.pauseTrigger(trigger.getKey());
-    assertEquals(Trigger.TriggerState.PAUSED, jobStore.getTriggerState(trigger.getKey()));
+    assertEquals(jobStore.getTriggerState(trigger.getKey()), Trigger.TriggerState.PAUSED);
 
     jobStore.resumeTrigger(trigger.getKey());
-    assertEquals(Trigger.TriggerState.NORMAL, jobStore.getTriggerState(trigger.getKey()));
+    assertEquals(jobStore.getTriggerState(trigger.getKey()), Trigger.TriggerState.NORMAL);
 
     OperableTrigger rt1 = jobStore.acquireNextTriggers(
         new Date(trigger.getNextFireTime().getTime()).getTime() + 10000,
@@ -328,7 +328,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
         .get(0);
 
     assertNotNull(rt2);
-    assertEquals(rt1.getJobKey(),rt2.getJobKey());
+    assertEquals(rt2.getJobKey(), rt1.getJobKey());
 
     assertTrue(jobStore.acquireNextTriggers(new Date(rt2.getNextFireTime().getTime()).getTime() + 1500,
         1,
@@ -347,7 +347,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     tr.setCalendarName(null);
 
     jobStore.storeTrigger(tr, false);
-    assertEquals(tr, jobStore.retrieveTrigger(tr.getKey()));
+    assertEquals(jobStore.retrieveTrigger(tr.getKey()), tr);
 
     try {
       jobStore.storeTrigger(tr, false);
@@ -358,8 +358,8 @@ public class HazelcastJobStoreTest extends AbstractTest {
 
     tr.setCalendarName("QQ");
     jobStore.storeTrigger(tr, true);
-    assertEquals(tr, jobStore.retrieveTrigger(tr.getKey()));
-    assertEquals("QQ", jobStore.retrieveTrigger(tr.getKey()).getCalendarName(), "StoreJob doesn't replace triggers");
+    assertEquals(jobStore.retrieveTrigger(tr.getKey()), tr);
+    assertEquals(jobStore.retrieveTrigger(tr.getKey()).getCalendarName(),"QQ", "StoreJob doesn't replace triggers");
   }
 
   @Test()
@@ -382,7 +382,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
         new Date().getTime());
 
     jobStore.storeTrigger(tr, false);
-    assertEquals(Trigger.TriggerState.PAUSED, jobStore.getTriggerState(tr.getKey()));
+    assertEquals(jobStore.getTriggerState(tr.getKey()), Trigger.TriggerState.PAUSED);
   }
 
   @Test()
@@ -408,7 +408,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     for (int i = 0; i < nJobs; i++) {
       JobKey jobKey = JobKey.jobKey("job" + i);
       JobDetail storedJob = store.retrieveJob(jobKey);
-      Assert.assertEquals(jobKey, storedJob.getKey());
+      Assert.assertEquals(storedJob.getKey(), jobKey);
     }
   }
 
@@ -437,11 +437,11 @@ public class HazelcastJobStoreTest extends AbstractTest {
     for (int i = 0; i < nJobs; i++) {
       JobKey jobKey = JobKey.jobKey("job" + i);
       JobDetail storedJob = store.retrieveJob(jobKey);
-      Assert.assertEquals(jobKey, storedJob.getKey());
+      Assert.assertEquals(storedJob.getKey(), jobKey);
 
       TriggerKey triggerKey = TriggerKey.triggerKey("job" + i);
       OperableTrigger storedTrigger = store.retrieveTrigger(triggerKey);
-      Assert.assertEquals(triggerKey, storedTrigger.getKey());
+      Assert.assertEquals(storedTrigger.getKey(), triggerKey);
     }
   }
 
@@ -477,7 +477,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
       // do. Otherwise
       // the store.acquireNextTriggers() will not work properly.
       Date fireTime = trigger.computeFirstFireTime(null);
-      Assert.assertEquals(true, fireTime != null);
+      Assert.assertNotNull(fireTime);
 
       store.storeJobAndTrigger(job, trigger);
     }
@@ -488,8 +488,8 @@ public class HazelcastJobStoreTest extends AbstractTest {
       int maxCount = 1;
       long timeWindow = 0;
       List<OperableTrigger> triggers = store.acquireNextTriggers(noLaterThan, maxCount, timeWindow);
-      Assert.assertEquals(1, triggers.size());
-      Assert.assertEquals("job" + i, triggers.get(0).getKey().getName());
+      Assert.assertEquals(triggers.size(), 1);
+      Assert.assertEquals(triggers.get(0).getKey().getName(), "job" + i);
 
       // Let's remove the trigger now.
       store.removeJob(triggers.get(0).getJobKey());
@@ -526,7 +526,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
       // do. Otherwise
       // the store.acquireNextTriggers() will not work properly.
       Date fireTime = trigger.computeFirstFireTime(null);
-      Assert.assertEquals(true, fireTime != null);
+      Assert.assertNotNull(fireTime);
 
       store.storeJobAndTrigger(job, trigger);
     }
@@ -538,7 +538,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     // they are a minute apart
     long timeWindow = 8 * MIN;
     List<OperableTrigger> triggers = store.acquireNextTriggers(noLaterThan, maxCount, timeWindow);
-    Assert.assertEquals(7, triggers.size());
+    Assert.assertEquals(triggers.size(), 7);
   }
 
   @Test
@@ -1182,9 +1182,6 @@ public class HazelcastJobStoreTest extends AbstractTest {
           + "]Should be PAUSED for trigger : [" + trigger.getKey()
           + "] and job [" + trigger.getJobKey() + "]");
       assertEquals(triggerState, Trigger.TriggerState.PAUSED);
-      //          .overridingErrorMessage(
-      //              "Should be PAUSED for trigger : [" + trigger.getKey()
-      //                  + "] and job [" + trigger.getJobKey() + "]");
     }
 
     triggersForJob = jobStore.getTriggersForJob(job3.getKey());
@@ -1333,7 +1330,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     long firstFireTime = new Date(trigger1.getNextFireTime().getTime()).getTime();
 
     List<OperableTrigger> acquiredTriggers = jobStore.acquireNextTriggers(firstFireTime + 500, 1, 0L);
-    assertEquals(1, acquiredTriggers.size());
+    assertEquals(acquiredTriggers.size(), 1);
 
     List<TriggerFiredResult> triggerFired = jobStore.triggersFired(acquiredTriggers);
     assertEquals(triggerFired.size(), 1);
