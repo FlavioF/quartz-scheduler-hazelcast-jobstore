@@ -1,17 +1,18 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
-import com.bikeemotion.quartz.jobstore.hazelcast.HazelcastJobStore;
 import com.beust.jcommander.internal.Maps;
 import com.bikeemotion.quartz.AbstractTest;
 import com.google.common.collect.Lists;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.quartz.Calendar;
 import org.quartz.DateBuilder;
 import org.quartz.JobBuilder;
@@ -19,7 +20,9 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.JobPersistenceException;
 import org.quartz.ObjectAlreadyExistsException;
+
 import static org.quartz.Scheduler.DEFAULT_GROUP;
+
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
@@ -43,6 +46,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+
+import java.util.UUID;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -70,6 +76,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     ClassLoadHelper loadHelper = new CascadingClassLoadHelper();
     loadHelper.initialize();
 
+    HazelcastJobStore.setHazelcastClient(hazelcastInstance);
     jobStore = createJobStore("AbstractJobStoreTest");
     jobStore.initialize(loadHelper, this.fSignaler);
     jobStore.schedulerStarted();
@@ -86,9 +93,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
   }
 
   @BeforeMethod
-  public void setUpBeforeEachTest() {
-    HazelcastJobStore.setHazelcastClient(hazelcastInstance);
-  }
+  public void setUpBeforeEachTest() {}
 
   @AfterMethod
   public void cleanUpAfterEachTest()
@@ -101,7 +106,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
   @Test()
   public void testShuttingDownWithShuttingDownHazelcast() throws SchedulerException {
 
-    HazelcastInstance hazelcastInstance = createHazelcastInstance();
+    HazelcastInstance hazelcastInstance = createHazelcastInstance(UUID.randomUUID().toString());
 
     HazelcastJobStore jobStore = createJobStore("test-shutting-down-hazelcast");
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
@@ -114,7 +119,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
   @Test()
   public void testShuttingDownWithoutShuttingDownHazelcast() throws SchedulerException {
 
-    HazelcastInstance hazelcastInstance = createHazelcastInstance();
+    HazelcastInstance hazelcastInstance = createHazelcastInstance(UUID.randomUUID().toString());
 
     HazelcastJobStore jobStore = createJobStore("test-shutting-down-hazelcast");
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
@@ -125,19 +130,18 @@ public class HazelcastJobStoreTest extends AbstractTest {
     assertTrue(hazelcastInstance.getLifecycleService().isRunning());
   }
 
-  @Test()
+  @Test
   public void testAcquireNextTrigger()
     throws Exception {
 
-    Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-    long baseFireTime = baseFireTimeDate.getTime();
+    long baseFireTime = DateBuilder.newDate().build().getTime();
 
     JobDetail job = JobBuilder.newJob(NoOpJob.class).build();
     jobStore.storeJob(job, true);
 
-    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "triggerGroup1", job, baseFireTime + 2000);
-    OperableTrigger t2 = buildAndComputeTrigger("trigger2", "triggerGroup1", job, baseFireTime + 500);
-    OperableTrigger t3 = buildAndComputeTrigger("trigger3", "triggerGroup2", job, baseFireTime + 1000);
+    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "testAcquireNextTrigger", job, baseFireTime + 2000);
+    OperableTrigger t2 = buildAndComputeTrigger("trigger2", "testAcquireNextTrigger", job, baseFireTime + 500);
+    OperableTrigger t3 = buildAndComputeTrigger("trigger3", "testAcquireNextTrigger", job, baseFireTime + 1000);
 
     assertTrue(jobStore.acquireNextTriggers(baseFireTime, 1, 0L).isEmpty());
 
@@ -172,23 +176,25 @@ public class HazelcastJobStoreTest extends AbstractTest {
     JobDetail job = JobBuilder.newJob(NoOpJob.class).build();
     jobStore.storeJob(job, true);
 
-    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "triggerGroup1", job, baseFireTime + 500);
-    OperableTrigger t2 = buildAndComputeTrigger("trigger2", "triggerGroup1", job, baseFireTime + 500);
+    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "testAcquireNextTriggerAfterMissFire", job, baseFireTime + 500);
+    OperableTrigger t2 = buildAndComputeTrigger("trigger2", "testAcquireNextTriggerAfterMissFire", job, baseFireTime + 500);
 
     jobStore.storeTrigger(t1, false);
     jobStore.storeTrigger(t2, false);
 
-    assertEquals(jobStore.acquireNextTriggers(baseFireTime + 600, 1, 0L).size(), 1);
+    List<OperableTrigger> acquired = jobStore.acquireNextTriggers(baseFireTime + 600, 1, 0L);
+    assertEquals(acquired.size(), 1);
+    jobStore.triggersFired(acquired);
+    OperableTrigger acquiredTrigger = acquired.get(0);
 
     Thread.sleep(6000);
 
-    assertEquals(jobStore.acquireNextTriggers(DateBuilder.newDate().build().getTime() + 600, 1, 0L).size(), 0);
+    long now = DateBuilder.newDate().build().getTime();
+    assertEquals(jobStore.acquireNextTriggers(now + 600, 1, 0L).size(), 0);
 
     OperableTrigger missfiredTriger = jobStore.getTriggersForJob(job.getKey())
         .stream()
-        .filter(item
-            -> item.getNextFireTime().getTime() != t1.getNextFireTime().getTime()
-                && item.getNextFireTime().getTime() != t2.getNextFireTime().getTime())
+        .filter(item -> !item.getKey().getName().equals(acquiredTrigger.getKey().getName()))
         .findFirst()
         .get();
 
@@ -198,41 +204,39 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.removeTrigger(t2.getKey());
   }
 
-  @Test()
+  @Test
   public void testAcquireNextTriggerBatch()
     throws Exception {
 
-    Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-    long baseFireTime = baseFireTimeDate.getTime();
+    long baseFireTime = DateBuilder.newDate().build().getTime();
 
     jobStore.storeJob(jobDetail, true);
 
     OperableTrigger trigger1 = buildTrigger("trigger1",
-        "triggerGroup1",
+        "testAcquireNextTriggerBatch",
         jobDetail,
-        baseFireTime + 200000,
-        baseFireTime + 200005);
+        baseFireTime + 2000,
+        baseFireTime + 2005);
     OperableTrigger trigger2 = buildTrigger("trigger2",
-        "triggerGroup1",
+        "testAcquireNextTriggerBatch",
         jobDetail,
-        baseFireTime + 200100,
-        baseFireTime + 200105);
+        baseFireTime + 2100,
+        baseFireTime + 2105);
     OperableTrigger trigger3 = buildTrigger("trigger3",
-        "triggerGroup1",
+        "testAcquireNextTriggerBatch",
         jobDetail,
-        baseFireTime + 200200,
-        baseFireTime + 200205);
+        baseFireTime + 2200,
+        baseFireTime + 2205);
     OperableTrigger trigger4 = buildTrigger("trigger4",
-        "triggerGroup1",
+        "testAcquireNextTriggerBatch",
         jobDetail,
-        baseFireTime + 200300,
-        baseFireTime + 200305);
-
+        baseFireTime + 2300,
+        baseFireTime + 2305);
     OperableTrigger trigger5 = buildTrigger("trigger5",
-        "triggerGroup2",
+        "testAcquireNextTriggerBatch",
         jobDetail,
-        baseFireTime + 500000,
-        baseFireTime + 700000);
+        baseFireTime + 5000,
+        baseFireTime + 7000);
 
     trigger1.computeFirstFireTime(null);
     trigger2.computeFirstFireTime(null);
@@ -246,17 +250,14 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.storeTrigger(trigger4, false);
     jobStore.storeTrigger(trigger5, false);
 
-    long firstFireTime = new Date(trigger1.getNextFireTime().getTime())
-        .getTime();
-
-    List<OperableTrigger> acquiredTriggers = jobStore.acquireNextTriggers(firstFireTime + 10000, 3, 1000L);
+    List<OperableTrigger> acquiredTriggers = jobStore.acquireNextTriggers(baseFireTime + 1500, 3, 1000L);
     assertEquals(3, acquiredTriggers.size());
 
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
     jobStore.releaseAcquiredTrigger(trigger3);
 
-    acquiredTriggers = jobStore.acquireNextTriggers(firstFireTime + 10000, 4, 1000L);
+    acquiredTriggers = jobStore.acquireNextTriggers(baseFireTime + 1500, 4, 1000L);
     assertEquals(4, acquiredTriggers.size());
 
     jobStore.releaseAcquiredTrigger(trigger1);
@@ -264,19 +265,19 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.releaseAcquiredTrigger(trigger3);
     jobStore.releaseAcquiredTrigger(trigger4);
 
-    acquiredTriggers = jobStore.acquireNextTriggers(firstFireTime + 10000, 5, 1000L);
+    acquiredTriggers = jobStore.acquireNextTriggers(baseFireTime + 1500, 5, 1000L);
     assertEquals(4, acquiredTriggers.size());
 
     jobStore.releaseAcquiredTrigger(trigger1);
     jobStore.releaseAcquiredTrigger(trigger2);
 
-    assertEquals(1, jobStore.acquireNextTriggers(firstFireTime + 1, 5, 0L).size());
+    assertEquals(1, jobStore.acquireNextTriggers(baseFireTime + 2001, 5, 0L).size());
     jobStore.releaseAcquiredTrigger(trigger1);
 
-    assertEquals(2, jobStore.acquireNextTriggers(firstFireTime + 250, 5, 199L).size());
+    assertEquals(2, jobStore.acquireNextTriggers(baseFireTime + 2000, 5, 150L).size());
     jobStore.releaseAcquiredTrigger(trigger1);
 
-    assertEquals(1, jobStore.acquireNextTriggers(firstFireTime + 150, 5, 50L).size());
+    assertEquals(1, jobStore.acquireNextTriggers(baseFireTime + 2000, 5, 150L).size());
     jobStore.releaseAcquiredTrigger(trigger1);
 
     jobStore.removeTrigger(trigger1.getKey());
@@ -286,17 +287,18 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.removeTrigger(trigger5.getKey());
   }
 
-  @Test()
+  @Test
   public void testTriggerStates()
     throws Exception {
 
-    jobStore.storeJob(jobDetail, false);
+    JobDetail newJob = JobBuilder.newJob(NoOpJob.class).withIdentity("job1", "testTriggerStates").build();
+    jobStore.storeJob(newJob, false);
 
     OperableTrigger trigger = buildTrigger("trigger1",
-        "triggerGroup1",
-        jobDetail,
-        System.currentTimeMillis() + 100000,
-        System.currentTimeMillis() + 200000);
+        "testTriggerStates",
+        newJob,
+        DateBuilder.newDate().build().getTime() + 1000,
+        DateBuilder.newDate().build().getTime() + 2000);
 
     trigger.computeFirstFireTime(null);
 
@@ -316,18 +318,19 @@ public class HazelcastJobStoreTest extends AbstractTest {
         1,
         1L)
         .get(0);
-
     assertNotNull(rt1);
     jobStore.releaseAcquiredTrigger(rt1);
 
     OperableTrigger rt2 = jobStore.acquireNextTriggers(
-        new Date(rt1.getNextFireTime().getTime()).getTime() + 10000,
+        new Date(rt1.getNextFireTime().getTime()).getTime() + 1500,
         1,
         1L)
         .get(0);
 
     assertNotNull(rt2);
-    assertTrue(jobStore.acquireNextTriggers(new Date(rt2.getNextFireTime().getTime()).getTime() + 10000,
+    assertEquals(rt1.getJobKey(),rt2.getJobKey());
+
+    assertTrue(jobStore.acquireNextTriggers(new Date(rt2.getNextFireTime().getTime()).getTime() + 1500,
         1,
         1L)
         .isEmpty());
@@ -1314,14 +1317,14 @@ public class HazelcastJobStoreTest extends AbstractTest {
   public void testTriggersFired()
     throws Exception {
 
-    Date baseFireTimeDate = DateBuilder.evenMinuteDateAfterNow();
-    long baseFireTime = baseFireTimeDate.getTime();
+    long baseFireTime = DateBuilder.newDate().build().getTime();
 
-    jobStore.storeJob(jobDetail, false);
+    JobDetail newJob = JobBuilder.newJob(NoOpJob.class).withIdentity("job1", "testTriggersFired").build();
+    jobStore.storeJob(newJob, false);
 
     OperableTrigger trigger1 = buildAndComputeTrigger("triggerFired1",
         "triggerFiredGroup",
-        jobDetail,
+        newJob,
         baseFireTime + 100,
         baseFireTime + 100);
 
@@ -1338,13 +1341,6 @@ public class HazelcastJobStoreTest extends AbstractTest {
     assertTrue(jobStore.checkExists(trigger1.getKey()));
     assertEquals(jobStore.getTriggerState(trigger1.getKey()), Trigger.TriggerState.NORMAL);
     jobStore.removeTrigger(trigger1.getKey());
-  }
-  
-  private HazelcastJobStore createJobStore(String name) {
-
-    HazelcastJobStore hzJobStore = new HazelcastJobStore();
-    hzJobStore.setInstanceName(name);
-    return hzJobStore;
   }
 
 }

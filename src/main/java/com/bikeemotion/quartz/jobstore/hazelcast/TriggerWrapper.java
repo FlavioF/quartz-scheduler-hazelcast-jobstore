@@ -1,9 +1,13 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
+import org.quartz.DateBuilder;
+
 import java.io.Serializable;
+
 import org.quartz.JobKey;
 import org.quartz.TriggerKey;
 import org.quartz.spi.OperableTrigger;
+
 
 public class TriggerWrapper implements Serializable {
 
@@ -15,7 +19,9 @@ public class TriggerWrapper implements Serializable {
 
     public final OperableTrigger trigger;
 
-    private final TriggerState state;
+    private final Long acquiredAt;
+
+    private TriggerState state;
 
     public Long getNextFireTime() {
 
@@ -33,6 +39,13 @@ public class TriggerWrapper implements Serializable {
         key = trigger.getKey();
         this.jobKey = trigger.getJobKey();
         this.state = state;
+        
+        // Change to normal if acquired is not released in 5 seconds
+        if (state == TriggerState.ACQUIRED) {
+            acquiredAt = DateBuilder.newDate().build().getTime();
+        } else {
+            acquiredAt = null;
+        }
     }
 
     public static TriggerWrapper newTriggerWrapper(OperableTrigger trigger) {
@@ -82,10 +95,20 @@ public class TriggerWrapper implements Serializable {
         return state;
     }
 
+    public Long getAcquiredAt() {
+      
+        return acquiredAt;
+    }
+
     @Override
     public String toString() {
 
-        return "TriggerWrapper{" + "trigger=" + trigger + ", state=" + state + ", nextFireTime=" + getNextFireTime() + '}';
+        return "TriggerWrapper{" 
+            + "trigger=" + trigger
+            + ", state=" + state
+            + ", nextFireTime=" + getNextFireTime()
+            + ", acquiredAt=" + getAcquiredAt()
+            + '}';
     }
 
 }
