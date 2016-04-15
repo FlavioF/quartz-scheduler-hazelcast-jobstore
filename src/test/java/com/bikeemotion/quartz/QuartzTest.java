@@ -154,7 +154,7 @@ public class QuartzTest extends AbstractTest {
   public void testScheduleDelete()
     throws Exception {
 
-    JobDetail job1 = buildJob("testScheduleAtSameTime1", DEFAULT_GROUP, MyJob.class);
+    JobDetail job1 = buildJob("testScheduleDelete", DEFAULT_GROUP, MyJob.class);
 
     scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150).getMillis()));
     assertTrue(scheduler.deleteJob(job1.getKey()));

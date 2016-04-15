@@ -43,7 +43,7 @@ public class HazelcastJobStoreUngracefulShutdownTest extends AbstractTest {
     Hazelcast.shutdownAll();
   }
   
-  @Test()
+  @Test
   public void testOneOfTwoInstancesCrashing()
     throws Exception {
   
@@ -51,6 +51,7 @@ public class HazelcastJobStoreUngracefulShutdownTest extends AbstractTest {
     HazelcastInstance hazelcast1 = createHazelcastInstance("testOneOfTwoInstancesCrashing");
     HazelcastJobStore.setHazelcastClient(hazelcast1);
     HazelcastJobStore jobstore1 = createJobStore("jobstore1");
+    jobstore1.setTriggerReleaseThreshold(450);
     jobstore1.setShutdownHazelcastOnShutdown(false);
     jobstore1.initialize(null, new SampleSignaler());
 
@@ -59,6 +60,7 @@ public class HazelcastJobStoreUngracefulShutdownTest extends AbstractTest {
     HazelcastJobStore.setHazelcastClient(hazelcast2);
     HazelcastJobStore jobstore2 = createJobStore("jobstore2");
     jobstore2.setShutdownHazelcastOnShutdown(false);
+    jobstore2.setTriggerReleaseThreshold(450);
     jobstore2.initialize(null, new SampleSignaler());
 
     // Add a job and its trigger to the scheduler
@@ -71,7 +73,7 @@ public class HazelcastJobStoreUngracefulShutdownTest extends AbstractTest {
     // Create a thread for acquiring next triggers on node 1
     Thread acquireThread = new Thread(() -> {
       try {
-        List<OperableTrigger> triggers1 = jobstore1.acquireNextTriggers(firstFireTime + 500, 1, 0L);
+        List<OperableTrigger> triggers1 = jobstore1.acquireNextTriggers(firstFireTime + 150, 1, 0L);
         triggers1.forEach(jobstore1::releaseAcquiredTrigger);
       } catch (JobPersistenceException e) {
         throw new RuntimeException(e);
@@ -83,15 +85,16 @@ public class HazelcastJobStoreUngracefulShutdownTest extends AbstractTest {
 
     // Start acquiring next triggers and right after start terminating Hazelcast
     acquireThread.start();
-    long waitTime = ThreadLocalRandom.current().nextInt(1, 51);
+    long waitTime = ThreadLocalRandom.current().nextInt(1,51);
     Thread.sleep(waitTime);
     terminateThread.start();
 
     // Wait a bit
-    Thread.sleep(5500);
+    Thread.sleep(500);
 
     // Acquire next triggers on node 2, we should get our trigger here!
-    List<OperableTrigger> triggers2 = jobstore2.acquireNextTriggers(firstFireTime + 500, 1, 0L);
+    List<OperableTrigger> triggers2 = jobstore2.acquireNextTriggers(firstFireTime + 150 + 6000, 10, 0L);
+    System.err.println("-------------------------> VAL " + triggers2.size());
     assertEquals(triggers2.size(), 
         1, 
         "Should find 1 trigger on node 2 after node 1 crashed when failing after "+waitTime+"ms");

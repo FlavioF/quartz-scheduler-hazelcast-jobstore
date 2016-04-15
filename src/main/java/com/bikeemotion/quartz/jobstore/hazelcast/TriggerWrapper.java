@@ -1,18 +1,15 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
+import org.quartz.DateBuilder;
+
 import java.io.Serializable;
 
 import org.quartz.JobKey;
 import org.quartz.TriggerKey;
 import org.quartz.spi.OperableTrigger;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class TriggerWrapper implements Serializable {
-  
-    private final static ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     private static final long serialVersionUID = 1L;
 
@@ -21,6 +18,8 @@ public class TriggerWrapper implements Serializable {
     public final JobKey jobKey;
 
     public final OperableTrigger trigger;
+
+    private final Long acquiredAt;
 
     private TriggerState state;
 
@@ -42,8 +41,10 @@ public class TriggerWrapper implements Serializable {
         this.state = state;
         
         // Change to normal if acquired is not released in 5 seconds
-        if(state == TriggerState.ACQUIRED){
-         executor.schedule( () -> { acquiredToNormal(); }, 5, TimeUnit.SECONDS);
+        if (state == TriggerState.ACQUIRED) {
+            acquiredAt = DateBuilder.newDate().build().getTime();
+        } else {
+            acquiredAt = null;
         }
     }
 
@@ -63,12 +64,6 @@ public class TriggerWrapper implements Serializable {
 
         TriggerWrapper tw = new TriggerWrapper(trigger, state);
         return tw;
-    }
-    
-    private void acquiredToNormal(){
-      if(this.state==TriggerState.ACQUIRED){
-        this.state = TriggerState.NORMAL;
-      }
     }
 
     @Override
@@ -100,10 +95,20 @@ public class TriggerWrapper implements Serializable {
         return state;
     }
 
+    public Long getAcquiredAt() {
+      
+        return acquiredAt;
+    }
+
     @Override
     public String toString() {
 
-        return "TriggerWrapper{" + "trigger=" + trigger + ", state=" + state + ", nextFireTime=" + getNextFireTime() + '}';
+        return "TriggerWrapper{" 
+            + "trigger=" + trigger
+            + ", state=" + state
+            + ", nextFireTime=" + getNextFireTime()
+            + ", acquiredAt=" + getAcquiredAt()
+            + '}';
     }
 
 }

@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -80,14 +79,12 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private final String HC_JOB_STORE_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
   private final String HC_JOB_STORE_PAUSED_JOB_GROUPS = "job-paused-job-groups";
   private final String HC_JOB_CALENDAR_MAP = "job-calendar-map";
-  private final String HC_JOB_STORE_TRIGGERS_QUEUE = "job-triggers-queue";
 
   private static long ftrCtr = System.currentTimeMillis();
 
   private SchedulerSignaler schedSignaler;
   private IMap<JobKey, JobDetail> jobsByKey;
   private IMap<TriggerKey, TriggerWrapper> triggersByKey;
-  private BlockingQueue<TriggerWrapper> triggers;
   private MultiMap<String, JobKey> jobsByGroup;
   private MultiMap<String, TriggerKey> triggersByGroup;
   private IMap<String, Calendar> calendarsByName;
@@ -95,6 +92,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private ISet<String> pausedJobGroups;
   private volatile boolean schedulerRunning = false;
   private long misfireThreshold = 5000;
+  private long triggerReleaseThreshold = 60000;
 
   private String instanceId;
   private String instanceName;
@@ -124,7 +122,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
     pausedTriggerGroups = hazelcastClient.getSet(HC_JOB_STORE_PAUSED_TRIGGER_GROUPS);
     pausedJobGroups = hazelcastClient.getSet(HC_JOB_STORE_PAUSED_JOB_GROUPS);
     calendarsByName = hazelcastClient.getMap(HC_JOB_CALENDAR_MAP);
-    triggers = hazelcastClient.getQueue(HC_JOB_STORE_TRIGGERS_QUEUE);
 
     triggersByKey.addIndex("nextFireTime", true);
 
@@ -154,7 +151,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   @Override
   public void shutdown() {
-    
+
     if (shutdownHazelcastOnShutdown) {
       hazelcastClient.shutdown();
     }
@@ -255,7 +252,10 @@ public class HazelcastJobStore implements JobStore, Serializable {
       final List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
 
       for (final OperableTrigger trigger : triggersForJob) {
-        removeTrigger(trigger.getKey(), false);
+        if(!removeTrigger(trigger.getKey(), false)){
+          LOG.warn("Error deleting trigger [{}] of job [{}] .", trigger, jobKey);
+          return false;
+        }
       }
 
       jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
@@ -323,7 +323,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
       final TriggerWrapper newTriger = newTriggerWrapper(newTrigger, state);
       triggersByKey.set(newTriger.key, newTriger);
-      triggers.add(newTriger);
       triggersByGroup.put(triggerKey.getGroup(), triggerKey);
     } finally {
       try {
@@ -393,7 +392,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     jobsByKey.clear();
     triggersByKey.clear();
-    triggers.clear();
     jobsByGroup.clear();
     triggersByGroup.clear();
     calendarsByName.clear();
@@ -474,8 +472,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     switch (operator) {
     case EQUALS:
-      final Collection<JobKey> jobKeys = jobsByGroup.
-          get(groupNameCompareValue);
+      final Collection<JobKey> jobKeys = jobsByGroup.get(groupNameCompareValue);
       if (jobKeys != null) {
         outList = new HashSet<>();
         for (JobKey jobKey : jobKeys) {
@@ -777,10 +774,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
       resumeGroups.add(jobKey.getGroup());
       resumeJob(jobKey);
     }
-    resumeGroups.stream().
-        forEach((group) -> {
-          pausedJobGroups.remove(group);
-        });
+    resumeGroups.stream().forEach((group) -> {
+      pausedJobGroups.remove(group);
+    });
     return new ArrayList<>(resumeGroups);
   }
 
@@ -829,51 +825,35 @@ public class HazelcastJobStore implements JobStore, Serializable {
       int maxCount, long timeWindow)
     throws JobPersistenceException {
 
-    if (triggers.isEmpty()) {
+    if (triggersByKey.isEmpty()) {
       return Collections.EMPTY_LIST;
     }
 
     long limit = noLaterThan + timeWindow;
-    final int size = triggers.size();
 
     List<OperableTrigger> result = new ArrayList<>();
     Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<>();
     Set<TriggerWrapper> excludedTriggers = new HashSet<>();
 
-    for (int i = 0; i < size; i++) {
-      TriggerWrapper tw = null;
+    // ordering triggers to try to ensure firetime order
+    List<TriggerWrapper> orderedTriggers = new ArrayList<>(triggersByKey.values());
+    Collections.sort(orderedTriggers, (o1, o2) -> o1.getNextFireTime().compareTo(o2.getNextFireTime()));
 
-      // take the next trigger from the queue
-      try {
-        tw = triggers.peek();
-        if (tw == null) {
-          break;
-        }
-      } catch (java.util.NoSuchElementException nsee) {
-        break;
-      }
-
-      // lock the trigger and move it to the end, only if still in the head
-      triggersByKey.lock(tw.key, 3, TimeUnit.SECONDS);
-      try {
-        if (tw.equals(triggers.peek())) {
-          triggers.add(tw); // move to the tail of queue
-          triggers.poll(); // remove from head
-        } else {
-          continue; //moving on if already not in the head of the queue
-        }
-      } finally {
-        try {
-          triggersByKey.unlock(tw.key); // unlock to not block other JobStores
-        } catch (IllegalMonitorStateException ex) {
-          LOG.warn("Error unlocking since it is already released.", ex);
-        }
-      }
+    for (int i = 0; i < orderedTriggers.size(); i++) {
+      TriggerWrapper tw = orderedTriggers.get(i);
       // proced after the other jobstore already not blocked
       triggersByKey.lock(tw.key, 5, TimeUnit.SECONDS);
       try {
 
-        if (tw.getState() == PAUSED) {
+        // when the trigger was in acquired state for to much time
+        if (tw.getState() == ACQUIRED && (tw.getAcquiredAt() == null
+            || tw.getAcquiredAt() + triggerReleaseThreshold + timeWindow < noLaterThan)) {
+          LOG.warn("Found a lost trigger [{}] that must be released at [{}]", tw, noLaterThan);
+          releaseAcquiredTrigger(tw.trigger);
+          tw = triggersByKey.get(tw.key);
+        }
+
+        if (tw.getState() != NORMAL && tw.getState() != WAITING) {
           continue;
         }
 
@@ -883,13 +863,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
         if (applyMisfire(tw)) {
           if (tw.trigger.getNextFireTime() != null) {
-            replaceTriggerWrapper(tw, newTriggerWrapper(tw, NORMAL));
+            storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
           }
           continue;
         }
 
         if (tw.getTrigger().getNextFireTime().getTime() > limit) {
-          replaceTriggerWrapper(tw, newTriggerWrapper(tw, NORMAL));
+          storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
           continue;
         }
 
@@ -901,7 +881,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         final JobDetail job = jobsByKey.get(tw.trigger.getJobKey());
         if (job.isConcurrentExectionDisallowed()) {
           if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
-            triggers.remove(tw);
+            // triggers.remove(tw); // TODO
             excludedTriggers.add(tw);
             continue; // go to next trigger in queue.
           } else {
@@ -911,7 +891,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
         OperableTrigger trig = (OperableTrigger) tw.trigger.clone();
         trig.setFireInstanceId(getFiredTriggerRecordId());
-        replaceTriggerWrapper(tw, newTriggerWrapper(trig, ACQUIRED));
+        storeTriggerWrapper(newTriggerWrapper(trig, ACQUIRED));
 
         result.add(trig);
 
@@ -931,7 +911,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
     // DisallowConcurrentExecution, we need to add
     // them back to store.
     if (excludedTriggers.size() > 0) {
-      triggers.addAll(excludedTriggers);
+      //TODO
+      //      triggers.addAll(excludedTriggers);
     }
     return result;
   }
@@ -942,7 +923,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     TriggerKey triggerKey = trigger.getKey();
     triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     try {
-      replaceTriggerWrapper(triggersByKey.get(trigger.getKey()), newTriggerWrapper(trigger, WAITING));
+      storeTriggerWrapper(newTriggerWrapper(trigger, WAITING));
     } finally {
       try {
         triggersByKey.unlock(triggerKey);
@@ -1110,7 +1091,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     tw.trigger.updateAfterMisfire(cal);
 
     if (tw.trigger.getNextFireTime() == null) {
-      replaceTriggerWrapper(tw, newTriggerWrapper(tw, STATE_COMPLETED));
+      storeTriggerWrapper(newTriggerWrapper(tw, STATE_COMPLETED));
       schedSignaler.notifySchedulerListenersFinalized(tw.trigger);
 
     } else if (tnft.equals(tw.trigger.getNextFireTime())) {
@@ -1138,7 +1119,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       if (removed) {
         // remove from triggers by group
         triggersByGroup.remove(key.getGroup(), key);
-        triggers.remove(tw);
+        //        triggers.remove(tw);
 
         if (removeOrphanedJob) {
           JobDetail job = jobsByKey.get(tw.jobKey);
@@ -1161,19 +1142,22 @@ public class HazelcastJobStore implements JobStore, Serializable {
     return removed;
   }
 
-  private void replaceTriggerWrapper(final TriggerWrapper oldTW, final TriggerWrapper newTW) {
-
-    triggers.remove(oldTW);
-    storeTriggerWrapper(newTW);
-
-  }
-
   private void storeTriggerWrapper(final TriggerWrapper tw) {
 
-    if (tw.getState() == NORMAL || tw.getState() == WAITING) {
-      triggers.add(tw);
-    }
     triggersByKey.set(tw.key, tw);
+  }
+
+  /**
+   * Set the max time which a acquired trigger must be released.
+   * It should be > 30000, since quartz executes acquireNextTriggers in a 30000 interval
+   * 
+   * @param triggerReleaseThreshold
+   */
+  public void setTriggerReleaseThreshold(long triggerReleaseThreshold) {
+    if(triggerReleaseThreshold > 30000){
+      LOG.warn("Try to increase your trigger release time threashold since quartz acquireNextTriggers in a 30000 interval");
+    }
+    this.triggerReleaseThreshold = triggerReleaseThreshold;
   }
 
 }
