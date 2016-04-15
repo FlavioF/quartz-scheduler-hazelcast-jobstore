@@ -100,7 +100,7 @@ public class QuartzTest extends AbstractTest {
     Config config = new Config();
     config.setProperty("hazelcast.logging.type", "slf4j");
     config.getGroupConfig().setName(UUID.randomUUID().toString());
-    
+
     hazelcastInstance = Hazelcast.newHazelcastInstance(config);
     HazelcastJobStore.setHazelcastClient(hazelcastInstance);
 
@@ -224,7 +224,7 @@ public class QuartzTest extends AbstractTest {
     assertEquals(MyJob.triggerKeys.poll(), "key1");
   }
 
-  @Test()
+  @Test
   public void testBasicStorageFunctions()
     throws Exception {
 
@@ -363,9 +363,9 @@ public class QuartzTest extends AbstractTest {
 
     pausedGroups = scheduler.getPausedTriggerGroups();
     assertTrue("Size of paused trigger groups list expected to be 1 ", pausedGroups.size() == 1);
-    //TODO fix it
-    //    s = scheduler.getTriggerState(triggerKey("t2", "g1"));
-    //    assertEquals(s, Trigger.TriggerState.PAUSED);
+
+    s = scheduler.getTriggerState(triggerKey("t2", "g1"));
+    assertEquals(s, Trigger.TriggerState.PAUSED);
 
     s = scheduler.getTriggerState(triggerKey("t4", "g1"));
     assertEquals(s, Trigger.TriggerState.PAUSED);
