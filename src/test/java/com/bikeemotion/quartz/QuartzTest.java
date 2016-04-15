@@ -150,7 +150,7 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test()
+  @Test(enabled = false)
   public void testScheduleDelete()
     throws Exception {
 
@@ -186,7 +186,7 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test(invocationCount = 5)
+  @Test(invocationCount = 5, enabled = false)
   public void testScheduleOutOfOrder()
     throws Exception {
 
