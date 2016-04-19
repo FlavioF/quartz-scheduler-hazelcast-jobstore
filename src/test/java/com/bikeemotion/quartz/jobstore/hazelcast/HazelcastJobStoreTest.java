@@ -24,6 +24,7 @@ import org.quartz.ObjectAlreadyExistsException;
 import static org.quartz.DateBuilder.newDate;
 import static org.quartz.Scheduler.DEFAULT_GROUP;
 
+import org.quartz.ScheduleBuilder;
 import org.quartz.SchedulerException;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
@@ -208,13 +209,8 @@ public class HazelcastJobStoreTest extends AbstractTest {
     JobDetail job = JobBuilder.newJob(NoOpJob.class).build();
     jobStore.storeJob(job, true);
 
-    OperableTrigger t1 = (OperableTrigger) newTrigger()
-            .withIdentity("trigger1", "triggerGroup1")
-            .forJob(job)
-            .startAt(new Date(baseFireTime + 500))
-            .withSchedule(simpleSchedule().withIntervalInSeconds(3).repeatForever().withMisfireHandlingInstructionFireNow())
-            .build();
-    t1.computeFirstFireTime(null);
+    SimpleScheduleBuilder scheduleBuilder = simpleSchedule().withIntervalInSeconds(3).repeatForever().withMisfireHandlingInstructionFireNow();
+    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "triggerGroup1", job, baseFireTime + 500, null, scheduleBuilder);
     jobStore.storeTrigger(t1, false);
 
     assertAcquiredAndRelease(baseFireTime, 1);
@@ -239,13 +235,8 @@ public class HazelcastJobStoreTest extends AbstractTest {
     JobDetail job = JobBuilder.newJob(NoOpJob.class).build();
     jobStore.storeJob(job, true);
 
-    OperableTrigger t1 = (OperableTrigger) newTrigger()
-            .withIdentity("trigger1", "triggerGroup1")
-            .forJob(job)
-            .startAt(new Date(baseFireTime + 500))
-            .withSchedule(simpleSchedule().withIntervalInSeconds(3).repeatForever().withMisfireHandlingInstructionNextWithExistingCount())
-            .build();
-    t1.computeFirstFireTime(null);
+    ScheduleBuilder scheduleBuilder = simpleSchedule().withIntervalInSeconds(3).repeatForever().withMisfireHandlingInstructionNextWithExistingCount();
+    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "triggerGroup1", job, baseFireTime + 500, null, scheduleBuilder);
     jobStore.storeTrigger(t1, false);
 
     assertAcquiredAndRelease(baseFireTime, 1);

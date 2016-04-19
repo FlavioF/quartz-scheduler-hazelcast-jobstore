@@ -17,6 +17,7 @@ import org.quartz.ObjectAlreadyExistsException;
 
 import static org.quartz.Scheduler.DEFAULT_GROUP;
 
+import org.quartz.ScheduleBuilder;
 import org.quartz.SimpleScheduleBuilder;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
@@ -109,12 +110,21 @@ public abstract class AbstractTest {
   }
 
   protected OperableTrigger buildTrigger(String triggerName,
+                                         String triggerGroup,
+                                         JobDetail job,
+                                         Long startAt,
+                                         Long endAt) {
+   return buildTrigger(triggerName, triggerGroup, job, startAt, endAt, null);
+  }
+
+  protected OperableTrigger buildTrigger(String triggerName,
       String triggerGroup,
       JobDetail job,
       Long startAt,
-      Long endAt) {
+      Long endAt,
+      ScheduleBuilder scheduleBuilder) {
 
-    SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
+    ScheduleBuilder schedule = scheduleBuilder!=null?scheduleBuilder : SimpleScheduleBuilder.simpleSchedule();
     return (OperableTrigger) TriggerBuilder
         .newTrigger()
         .withIdentity(triggerName, triggerGroup)
@@ -127,7 +137,7 @@ public abstract class AbstractTest {
 
   protected OperableTrigger buildTrigger(String triggerName, String triggerGroup, JobDetail job, Long startAt) {
 
-    return buildTrigger(triggerName, triggerGroup, job, startAt, null);
+    return buildTrigger(triggerName, triggerGroup, job, startAt, null, null);
   }
 
   protected OperableTrigger buildTrigger()
@@ -162,9 +172,21 @@ public abstract class AbstractTest {
       String triggerGroup,
       JobDetail job,
       Long startAt,
-      Long endAt) {
+      Long endAt,
+      ScheduleBuilder scheduleBuilder) {
 
-    OperableTrigger trigger = buildTrigger(triggerName, triggerGroup, job, startAt, endAt);
+    OperableTrigger trigger = buildTrigger(triggerName, triggerGroup, job, startAt, endAt, scheduleBuilder);
+    trigger.computeFirstFireTime(null);
+    return trigger;
+  }
+
+  protected OperableTrigger buildAndComputeTrigger(String triggerName,
+                                                   String triggerGroup,
+                                                   JobDetail job,
+                                                   Long startAt,
+                                                   Long endAt) {
+
+    OperableTrigger trigger = buildTrigger(triggerName, triggerGroup, job, startAt, endAt,null);
     trigger.computeFirstFireTime(null);
     return trigger;
   }
