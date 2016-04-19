@@ -321,8 +321,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
           ? PAUSED
           : NORMAL;
 
-      final TriggerWrapper newTriger = newTriggerWrapper(newTrigger, state);
-      triggersByKey.set(newTriger.key, newTriger);
+      final TriggerWrapper newTriggerWrapper = newTriggerWrapper(newTrigger, state);
+      triggersByKey.set(newTriggerWrapper.key, newTriggerWrapper);
       triggersByGroup.put(triggerKey.getGroup(), triggerKey);
     } finally {
       try {
@@ -582,8 +582,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     triggersByKey.lock(triggerKey, 5, TimeUnit.SECONDS);
     try {
-      final TriggerWrapper newTrigger = newTriggerWrapper(
-          triggersByKey.get(triggerKey), PAUSED);
+      final TriggerWrapper newTrigger = newTriggerWrapper(triggersByKey.get(triggerKey), PAUSED);
       triggersByKey.set(triggerKey, newTrigger);
     } finally {
       try {
@@ -863,9 +862,10 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
         if (applyMisfire(tw)) {
           if (tw.trigger.getNextFireTime() != null) {
-            storeTriggerWrapper(newTriggerWrapper(tw, NORMAL));
+              tw = newTriggerWrapper(tw, NORMAL);
+          } else {
+              continue;
           }
-          continue;
         }
 
         if (tw.getTrigger().getNextFireTime().getTime() > limit) {

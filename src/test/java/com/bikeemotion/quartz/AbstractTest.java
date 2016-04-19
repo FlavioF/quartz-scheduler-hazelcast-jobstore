@@ -21,14 +21,13 @@ import org.quartz.SimpleScheduleBuilder;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
 import org.quartz.impl.calendar.BaseCalendar;
-import org.quartz.spi.JobStore;
 import org.quartz.spi.OperableTrigger;
 
 
 public abstract class AbstractTest {
 
   protected HazelcastInstance hazelcastInstance;
-  protected JobStore jobStore;
+  protected HazelcastJobStore jobStore;
   protected int buildTriggerIndex = 0;
   protected int buildJobIndex = 0;
 
