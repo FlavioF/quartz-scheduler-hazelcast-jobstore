@@ -180,8 +180,10 @@ public class HazelcastJobStoreTest extends AbstractTest {
     JobDetail job = JobBuilder.newJob(NoOpJob.class).build();
     jobStore.storeJob(job, true);
 
-    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "testAcquireNextTriggerAfterMissFire", job, baseFireTime + 500);
-    OperableTrigger t2 = buildAndComputeTrigger("trigger2", "testAcquireNextTriggerAfterMissFire", job, baseFireTime + 500);
+    OperableTrigger t1 = buildAndComputeTrigger("trigger1", "testAcquireNextTriggerAfterMissFire", job, baseFireTime + 500,null,
+                                                SimpleScheduleBuilder.simpleSchedule().withMisfireHandlingInstructionFireNow());
+    OperableTrigger t2 = buildAndComputeTrigger("trigger2", "testAcquireNextTriggerAfterMissFire", job, baseFireTime + 500, null,
+                                                SimpleScheduleBuilder.simpleSchedule().withMisfireHandlingInstructionFireNow());
 
     jobStore.storeTrigger(t1, false);
     jobStore.storeTrigger(t2, false);
@@ -217,7 +219,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
 
     Thread.sleep(5000);
     // missed one execution, next execution is immediate
-    assertAcquiredAndRelease(newDate().build().getTime() + 250, 1);
+    assertAcquiredAndRelease(newDate().build().getTime() + 500, 1);
 
     Thread.sleep(1000);
     // next execution is at 8 seconds tick (5 + 3) outside interval (6 sec to 7 sec tick), no triggers should be acquired
