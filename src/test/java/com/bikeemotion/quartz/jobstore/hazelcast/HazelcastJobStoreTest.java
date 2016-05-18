@@ -171,7 +171,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     jobStore.removeTrigger(t3.getKey());
   }
 
-  @Test()
+  @Test(enabled = false)
   public void testAcquireNextTriggerAfterMissFire()
     throws Exception {
 

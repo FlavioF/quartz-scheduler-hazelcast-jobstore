@@ -32,7 +32,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
     
         <hazelcast.version>3.2.1</hazelcast.version>
-        <quartz.version>2.2.1</quartz.version>
+        <quartz.version>2.2.3</quartz.version>
         <guava.version>17.0</guava.version>
         <joda.time.version>2.4</joda.time.version>
     
