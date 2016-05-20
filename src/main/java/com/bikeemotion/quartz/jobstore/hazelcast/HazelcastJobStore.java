@@ -861,6 +861,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         }
 
         if (applyMisfire(tw)) {
+          LOG.debug("Misfire applied {}", tw);
           if (tw.trigger.getNextFireTime() != null) {
               tw = newTriggerWrapper(tw, NORMAL);
           } else {
@@ -1040,6 +1041,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public void setShutdownHazelcastOnShutdown(boolean shutdownHazelcastOnShutdown) {
 
     this.shutdownHazelcastOnShutdown = shutdownHazelcastOnShutdown;
+  }
+
+  public long getMisfireThreshold() {
+
+    return misfireThreshold;
   }
 
   public void setMisfireThreshold(long misfireThreshold) {
