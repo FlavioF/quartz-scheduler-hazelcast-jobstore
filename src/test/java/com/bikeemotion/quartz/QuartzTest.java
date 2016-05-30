@@ -130,7 +130,7 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test()
+  @Test
   public void testSchedule()
     throws Exception {
 
@@ -166,7 +166,7 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test()
+  @Test
   public void testScheduleAtSameTime()
     throws Exception {
 
@@ -186,7 +186,7 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test(invocationCount = 5, enabled = false)
+  @Test(invocationCount = 3)
   public void testScheduleOutOfOrder()
     throws Exception {
 
@@ -207,7 +207,7 @@ public class QuartzTest extends AbstractTest {
     assertEquals(MyJob.triggerKeys.poll(), "key3");
   }
 
-  @Test()
+  @Test
   public void testScheduleJobWithRepeatTime()
     throws Exception {
 
@@ -435,7 +435,6 @@ public class QuartzTest extends AbstractTest {
     assertTrue(scheduler.checkExists(jobKey("j2")), "Unexpected non-existence of job named 'j2'.");
   }
 
-  //TODO: FIX IT (URGENT)
   @Test
   public void testShutdownWithSleepReturnsAfterAllThreadsAreStopped()
     throws Exception {
