@@ -178,7 +178,7 @@ public class QuartzTest extends AbstractTest {
     scheduler.scheduleJob(job2, buildTrigger("k22", DEFAULT_GROUP, job2, DateTime.now().plusMillis(100).getMillis()));
     scheduler.scheduleJob(job3, buildTrigger("k23", DEFAULT_GROUP, job3, DateTime.now().plusMillis(100).getMillis()));
 
-    Thread.sleep(150);
+    Thread.sleep(350);
     assertEquals(MyJob.count, 3);
     assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
     assertTrue(MyJob.jobKeys.contains(job2.getKey().getName()));
