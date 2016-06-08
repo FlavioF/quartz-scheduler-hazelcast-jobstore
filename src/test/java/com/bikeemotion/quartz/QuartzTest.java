@@ -130,7 +130,7 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test()
+  @Test
   public void testSchedule()
     throws Exception {
 
@@ -150,23 +150,23 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test(enabled = false)
+  @Test  
   public void testScheduleDelete()
     throws Exception {
 
     JobDetail job1 = buildJob("testScheduleDelete", DEFAULT_GROUP, MyJob.class);
 
-    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150).getMillis()));
+    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150000).getMillis()));
     assertTrue(scheduler.deleteJob(job1.getKey()));
     scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150).getMillis()));
 
     Thread.sleep(160);
     assertEquals(MyJob.count, 1);
     assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
-
+    
   }
 
-  @Test()
+  @Test
   public void testScheduleAtSameTime()
     throws Exception {
 
@@ -178,7 +178,7 @@ public class QuartzTest extends AbstractTest {
     scheduler.scheduleJob(job2, buildTrigger("k22", DEFAULT_GROUP, job2, DateTime.now().plusMillis(100).getMillis()));
     scheduler.scheduleJob(job3, buildTrigger("k23", DEFAULT_GROUP, job3, DateTime.now().plusMillis(100).getMillis()));
 
-    Thread.sleep(150);
+    Thread.sleep(350);
     assertEquals(MyJob.count, 3);
     assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
     assertTrue(MyJob.jobKeys.contains(job2.getKey().getName()));
@@ -186,7 +186,7 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test(invocationCount = 5, enabled = false)
+  @Test(invocationCount = 3)
   public void testScheduleOutOfOrder()
     throws Exception {
 
@@ -207,7 +207,7 @@ public class QuartzTest extends AbstractTest {
     assertEquals(MyJob.triggerKeys.poll(), "key3");
   }
 
-  @Test()
+  @Test
   public void testScheduleJobWithRepeatTime()
     throws Exception {
 
@@ -435,7 +435,6 @@ public class QuartzTest extends AbstractTest {
     assertTrue(scheduler.checkExists(jobKey("j2")), "Unexpected non-existence of job named 'j2'.");
   }
 
-  //TODO: FIX IT (URGENT)
   @Test
   public void testShutdownWithSleepReturnsAfterAllThreadsAreStopped()
     throws Exception {

@@ -258,7 +258,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         }
       }
 
-      jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
+      jobsByKey.lock(jobKey, 5, TimeUnit.MILLISECONDS);
       try {
         jobsByGroup.remove(jobKey.getGroup(), jobKey);
         removed = jobsByKey.remove(jobKey) != null;
@@ -835,7 +835,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     Set<TriggerWrapper> excludedTriggers = new HashSet<>();
 
     // ordering triggers to try to ensure firetime order
-    List<TriggerWrapper> orderedTriggers = new ArrayList<>(triggersByKey.values());
+    List<TriggerWrapper> orderedTriggers = new ArrayList<>(triggersByKey.values(new TriggersPredicate(limit)));
     Collections.sort(orderedTriggers, (o1, o2) -> o1.getNextFireTime().compareTo(o2.getNextFireTime()));
 
     for (int i = 0; i < orderedTriggers.size(); i++) {
@@ -846,8 +846,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
         // when the trigger was in acquired state for to much time
         if (tw.getState() == ACQUIRED && (tw.getAcquiredAt() == null
-            || tw.getAcquiredAt() + triggerReleaseThreshold + timeWindow < noLaterThan)) {
-          LOG.warn("Found a lost trigger [{}] that must be released at [{}]", tw, noLaterThan);
+            || tw.getAcquiredAt() + triggerReleaseThreshold + timeWindow < limit)) {
+          LOG.warn("Found a lost trigger [{}] that must be released at [{}]", tw, limit);
           releaseAcquiredTrigger(tw.trigger);
           tw = triggersByKey.get(tw.key);
         }
@@ -861,6 +861,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         }
 
         if (applyMisfire(tw)) {
+          LOG.debug("Misfire applied {}", tw);
           if (tw.trigger.getNextFireTime() != null) {
               tw = newTriggerWrapper(tw, NORMAL);
           } else {
@@ -1042,6 +1043,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
     this.shutdownHazelcastOnShutdown = shutdownHazelcastOnShutdown;
   }
 
+  public long getMisfireThreshold() {
+
+    return misfireThreshold;
+  }
+
   public void setMisfireThreshold(long misfireThreshold) {
 
     this.misfireThreshold = misfireThreshold;
@@ -1187,18 +1193,10 @@ class TriggerByJobPredicate implements Predicate<JobKey, TriggerWrapper> {
 class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
 
   long noLaterThanWithTimeWindow;
-  TriggerState noState;
-
-  public TriggersPredicate(long noLaterThanWithTimeWindow,
-      TriggerState state) {
-
-    this.noLaterThanWithTimeWindow = noLaterThanWithTimeWindow;
-    this.noState = state;
-  }
 
   public TriggersPredicate(long noLaterThanWithTimeWindow) {
 
-    this(noLaterThanWithTimeWindow, ACQUIRED);
+ this.noLaterThanWithTimeWindow = noLaterThanWithTimeWindow;
   }
 
   @Override
@@ -1208,7 +1206,6 @@ class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
       return false;
     }
 
-    return entry.getValue().getNextFireTime() <= noLaterThanWithTimeWindow
-        && entry.getValue().getState() != noState;
+    return entry.getValue().getNextFireTime() <= noLaterThanWithTimeWindow;
   }
 }
