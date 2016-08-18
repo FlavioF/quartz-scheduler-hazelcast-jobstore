@@ -117,6 +117,9 @@ public class QuartzTest extends AbstractTest {
     MyJob.count = 0;
     MyJob.jobKeys.clear();
     MyJob.triggerKeys.clear();
+    MyNoConcurrentJob.count = 0;
+    MyNoConcurrentJob.jobKeys.clear();
+    MyNoConcurrentJob.triggerKeys.clear();
 
   }
 
@@ -150,20 +153,21 @@ public class QuartzTest extends AbstractTest {
 
   }
 
-  @Test  
+  @Test
   public void testScheduleDelete()
     throws Exception {
 
     JobDetail job1 = buildJob("testScheduleDelete", DEFAULT_GROUP, MyJob.class);
 
-    scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150000).getMillis()));
+    scheduler.scheduleJob(job1,
+        buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150000).getMillis()));
     assertTrue(scheduler.deleteJob(job1.getKey()));
     scheduler.scheduleJob(job1, buildTrigger("k21", DEFAULT_GROUP, job1, DateTime.now().plusMillis(150).getMillis()));
 
     Thread.sleep(160);
     assertEquals(MyJob.count, 1);
     assertTrue(MyJob.jobKeys.contains(job1.getKey().getName()));
-    
+
   }
 
   @Test
@@ -222,6 +226,44 @@ public class QuartzTest extends AbstractTest {
 
     assertEquals(MyJob.count, 8);
     assertEquals(MyJob.triggerKeys.poll(), "key1");
+  }
+
+  @Test
+  public void testScheduleJobWithRepeatTimeWithConcurrentExecutionDisallowed()
+    throws Exception {
+
+    JobDetail job1 = buildJob("CJob1", DEFAULT_GROUP, MyNoConcurrentJob.class);
+    final SimpleTriggerImpl o = (SimpleTriggerImpl) buildTrigger("Ckey1", DEFAULT_GROUP, job1);
+    o.setRepeatInterval(100);
+    o.setRepeatCount(10);
+
+    MyNoConcurrentJob.waitTime = 300;
+
+    scheduler.scheduleJob(job1, o);
+    Thread.sleep(750);
+
+    // since MyNoCocurrent job takes 300 ms to finish
+    assertEquals(MyNoConcurrentJob.count, 3);
+    assertEquals(MyNoConcurrentJob.triggerKeys.poll(), "Ckey1");
+  }
+
+  @Test
+  public void testScheduleJobWithRepeatTimeWithConcurrentExecutionDisallowed_withFastJob()
+    throws Exception {
+
+    JobDetail job1 = buildJob("CJob2", DEFAULT_GROUP, MyNoConcurrentJob.class);
+    final SimpleTriggerImpl o = (SimpleTriggerImpl) buildTrigger("Ckey2", DEFAULT_GROUP, job1);
+    o.setRepeatInterval(100);
+    o.setRepeatCount(10);
+
+    MyNoConcurrentJob.waitTime = 10;
+
+    scheduler.scheduleJob(job1, o);
+    Thread.sleep(750);
+
+    // since MyNoCocurrent job takes 300 ms to finish
+    assertEquals(MyNoConcurrentJob.count, 8);
+    assertEquals(MyNoConcurrentJob.triggerKeys.poll(), "Ckey2");
   }
 
   @Test
