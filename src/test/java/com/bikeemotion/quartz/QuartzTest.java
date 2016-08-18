@@ -240,7 +240,7 @@ public class QuartzTest extends AbstractTest {
     MyNoConcurrentJob.waitTime = 300;
 
     scheduler.scheduleJob(job1, o);
-    Thread.sleep(750);
+    Thread.sleep(850);
 
     // since MyNoCocurrent job takes 300 ms to finish
     assertEquals(MyNoConcurrentJob.count, 3);
