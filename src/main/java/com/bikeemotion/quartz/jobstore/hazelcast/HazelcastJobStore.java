@@ -17,6 +17,7 @@ import org.quartz.ObjectAlreadyExistsException;
 import org.quartz.SchedulerConfigException;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
+import org.quartz.Trigger.CompletedExecutionInstruction;
 import org.quartz.TriggerKey;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.quartz.impl.matchers.StringMatcher;
@@ -47,6 +48,7 @@ import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.ACQUIRED;
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.BLOCKED;
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.NORMAL;
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.PAUSED;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.PAUSED_BLOCKED;
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.STATE_COMPLETED;
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.WAITING;
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.toClassicTriggerState;
@@ -252,7 +254,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       final List<OperableTrigger> triggersForJob = getTriggersForJob(jobKey);
 
       for (final OperableTrigger trigger : triggersForJob) {
-        if(!removeTrigger(trigger.getKey(), false)){
+        if (!removeTrigger(trigger.getKey(), false)) {
           LOG.warn("Error deleting trigger [{}] of job [{}] .", trigger, jobKey);
           return false;
         }
@@ -847,7 +849,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         // when the trigger was in acquired state for to much time
         if (tw.getState() == ACQUIRED && (tw.getAcquiredAt() == null
             || tw.getAcquiredAt() + triggerReleaseThreshold + timeWindow < limit)) {
-          LOG.warn("Found a lost trigger [{}] that must be released at [{}]", tw, limit);
+          LOG.warn("Found a lost trigger [{}] that should be released at [{}]", tw, limit);
           releaseAcquiredTrigger(tw.trigger);
           tw = triggersByKey.get(tw.key);
         }
@@ -863,9 +865,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
         if (applyMisfire(tw)) {
           LOG.debug("Misfire applied {}", tw);
           if (tw.trigger.getNextFireTime() != null) {
-              tw = newTriggerWrapper(tw, NORMAL);
+            tw = newTriggerWrapper(tw, NORMAL);
           } else {
-              continue;
+            continue;
           }
         }
 
@@ -874,16 +876,15 @@ public class HazelcastJobStore implements JobStore, Serializable {
           continue;
         }
 
+        final JobKey jobKey = tw.trigger.getJobKey();
+        final JobDetail job = jobsByKey.get(tw.trigger.getJobKey());
+
         // If trigger's job is set as @DisallowConcurrentExecution, and it has
         // already been added to result, then
         // put it back into the timeTriggers set and continue to search for next
         // trigger.
-        final JobKey jobKey = tw.trigger.getJobKey();
-        final JobDetail job = jobsByKey.get(tw.trigger.getJobKey());
         if (job.isConcurrentExectionDisallowed()) {
           if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
-            // triggers.remove(tw); // TODO
-            excludedTriggers.add(tw);
             continue; // go to next trigger in queue.
           } else {
             acquiredJobKeysForNoConcurrentExec.add(jobKey);
@@ -908,13 +909,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
       }
     }
 
-    // If we did excluded triggers to prevent ACQUIRE state due to
-    // DisallowConcurrentExecution, we need to add
-    // them back to store.
-    if (excludedTriggers.size() > 0) {
-      //TODO
-      //      triggers.addAll(excludedTriggers);
-    }
     return result;
   }
 
@@ -967,29 +961,39 @@ public class HazelcastJobStore implements JobStore, Serializable {
         tw.trigger.triggered(cal);
         trigger.triggered(cal);
 
-        tw = newTriggerWrapper(trigger, WAITING);
-
-        TriggerFiredBundle bndle = new TriggerFiredBundle(retrieveJob(tw.jobKey),
-            trigger, cal, false, new Date(), trigger.getPreviousFireTime(),
-            prevFireTime, trigger.getNextFireTime());
-
-        JobDetail job = bndle.getJobDetail();
+        JobDetail job = retrieveJob(tw.jobKey);
 
         if (job.isConcurrentExectionDisallowed()) {
+
           ArrayList<TriggerWrapper> trigs = getTriggerWrappersForJob(job.getKey());
           for (TriggerWrapper ttw : trigs) {
             if (ttw.getState() == WAITING) {
               ttw = newTriggerWrapper(ttw, BLOCKED);
+            } else if (ttw.getState() == PAUSED) {
+              ttw = newTriggerWrapper(ttw, PAUSED_BLOCKED);
             }
-            if (ttw.getState() == PAUSED) {
-              ttw = newTriggerWrapper(ttw, BLOCKED);
-            }
-            storeTriggerWrapper(ttw);
           }
-        } else if (tw.trigger.getNextFireTime() != null) {
 
+          tw = newTriggerWrapper(trigger, ACQUIRED);
+
+        } else {
+          tw = newTriggerWrapper(trigger, WAITING);
+        }
+        
+        
+        if (tw.trigger.getNextFireTime() != null) {
           storeTriggerWrapper(tw);
         }
+
+        TriggerFiredBundle bndle = new TriggerFiredBundle(
+            retrieveJob(tw.jobKey),
+            trigger,
+            cal,
+            false,
+            new Date(),
+            trigger.getPreviousFireTime(),
+            prevFireTime,
+            trigger.getNextFireTime());
 
         results.add(new TriggerFiredResult(bndle));
       } finally {
@@ -1010,6 +1014,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
       JobDetail jobDetail,
       Trigger.CompletedExecutionInstruction triggerInstCode) {
 
+    TriggerWrapper tw = triggersByKey.get(trigger.getKey());
+
     if (jobDetail.isPersistJobDataAfterExecution()) {
       JobKey jobKey = jobDetail.getKey();
       jobsByKey.lock(jobKey, 5, TimeUnit.SECONDS);
@@ -1022,6 +1028,56 @@ public class HazelcastJobStore implements JobStore, Serializable {
         } catch (IllegalMonitorStateException ex) {
           LOG.warn("Error unlocking since it is already released.", ex);
         }
+      }
+    } else if (jobDetail.isConcurrentExectionDisallowed()) {
+
+      ArrayList<TriggerWrapper> trigs = getTriggerWrappersForJob(jobDetail.getKey());
+
+      for (TriggerWrapper ttw : trigs) {
+        if (ttw.getState() == BLOCKED || ttw.getState() == ACQUIRED) {
+          storeTriggerWrapper(newTriggerWrapper(ttw, WAITING));
+        } else if (ttw.getState() == PAUSED_BLOCKED) {
+          storeTriggerWrapper(newTriggerWrapper(ttw, PAUSED));
+        }
+      }
+      schedSignaler.signalSchedulingChange(0L);
+    }
+
+    // check for trigger deleted during execution...
+    if (tw != null) {
+      if (triggerInstCode == CompletedExecutionInstruction.DELETE_TRIGGER) {
+
+        try {
+          if (trigger.getNextFireTime() == null) {
+            // double check for possible reschedule within job 
+            // execution, which would cancel the need to delete...
+            if (tw.getTrigger().getNextFireTime() == null) {
+
+              removeTrigger(trigger.getKey());
+
+            }
+          } else {
+            removeTrigger(trigger.getKey());
+            schedSignaler.signalSchedulingChange(0L);
+          }
+        } catch (JobPersistenceException ex) {
+          LOG.error("Error removing trigger", ex);
+        }
+      } else if (triggerInstCode == CompletedExecutionInstruction.SET_TRIGGER_COMPLETE) {
+        storeTriggerWrapper(newTriggerWrapper(tw, STATE_COMPLETED));
+        schedSignaler.signalSchedulingChange(0L);
+      } else if (triggerInstCode == CompletedExecutionInstruction.SET_TRIGGER_ERROR) {
+        LOG.warn("Trigger " + trigger.getKey() + " set to ERROR state.");
+        storeTriggerWrapper(newTriggerWrapper(tw, BLOCKED));
+        schedSignaler.signalSchedulingChange(0L);
+      } else if (triggerInstCode == CompletedExecutionInstruction.SET_ALL_JOB_TRIGGERS_ERROR) {
+        LOG.info("All triggers of Job "
+            + trigger.getJobKey() + " set to ERROR state.");
+        storeTriggerWrapper(newTriggerWrapper(tw, BLOCKED));
+        schedSignaler.signalSchedulingChange(0L);
+      } else if (triggerInstCode == CompletedExecutionInstruction.SET_ALL_JOB_TRIGGERS_COMPLETE) {
+        storeTriggerWrapper(newTriggerWrapper(tw, STATE_COMPLETED));
+        schedSignaler.signalSchedulingChange(0L);
       }
     }
   }
@@ -1160,8 +1216,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
    * @param triggerReleaseThreshold
    */
   public void setTriggerReleaseThreshold(long triggerReleaseThreshold) {
-    if(triggerReleaseThreshold > 30000){
-      LOG.warn("Try to increase your trigger release time threashold since quartz acquireNextTriggers in a 30000 interval");
+    if (triggerReleaseThreshold > 30000) {
+      LOG.warn(
+          "Try to increase your trigger release time threashold since quartz acquireNextTriggers in a 30000 interval");
     }
     this.triggerReleaseThreshold = triggerReleaseThreshold;
   }
@@ -1196,7 +1253,7 @@ class TriggersPredicate implements Predicate<TriggerKey, TriggerWrapper> {
 
   public TriggersPredicate(long noLaterThanWithTimeWindow) {
 
- this.noLaterThanWithTimeWindow = noLaterThanWithTimeWindow;
+    this.noLaterThanWithTimeWindow = noLaterThanWithTimeWindow;
   }
 
   @Override

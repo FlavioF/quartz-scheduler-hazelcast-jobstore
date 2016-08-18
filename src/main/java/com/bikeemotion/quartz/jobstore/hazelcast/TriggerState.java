@@ -7,6 +7,7 @@ public enum TriggerState {
   COMPLETE,
   ERROR,
   BLOCKED,
+  PAUSED_BLOCKED,
   ACQUIRED,
   WAITING,
   STATE_COMPLETED;
@@ -22,6 +23,7 @@ public enum TriggerState {
     case ERROR:
       return org.quartz.Trigger.TriggerState.ERROR;
     case BLOCKED:
+    case PAUSED_BLOCKED:
       return org.quartz.Trigger.TriggerState.BLOCKED;
     case NORMAL:
     case ACQUIRED:
