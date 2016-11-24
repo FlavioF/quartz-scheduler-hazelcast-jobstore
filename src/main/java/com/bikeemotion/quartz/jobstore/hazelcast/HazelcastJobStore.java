@@ -822,7 +822,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     }
 
     long limit = noLaterThan + timeWindow;
-
+    
     List<OperableTrigger> result = new ArrayList<>();
     Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<>();
 
@@ -1186,7 +1186,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         if (removeOrphanedJob) {
           JobDetail job = jobsByKey.get(tw.jobKey);
           List<OperableTrigger> trigs = getTriggersForJob(tw.jobKey);
-          if ((trigs == null || trigs.isEmpty()) && !job.isDurable()) {
+          if ((trigs == null || trigs.isEmpty()) && (job != null && !job.isDurable())) {
             if (removeJob(job.getKey())) {
               schedSignaler.notifySchedulerListenersJobDeleted(job.getKey());
             }
