@@ -884,7 +884,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         // put it back into the timeTriggers set and continue to search for next
         // trigger.
         if (job == null) {
-          LOG.debug("Job not found);
+          LOG.debug("Job not found");
           continue;
         } else if(job.isConcurrentExectionDisallowed()) {
           if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
