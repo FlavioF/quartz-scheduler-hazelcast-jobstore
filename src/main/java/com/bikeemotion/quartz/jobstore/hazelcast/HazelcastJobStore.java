@@ -6,8 +6,6 @@ import com.hazelcast.core.IMap;
 import com.hazelcast.core.ISet;
 import com.hazelcast.core.MultiMap;
 import com.hazelcast.query.Predicate;
-import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.Calendar;
 import org.quartz.DateBuilder;
 import org.quartz.JobDetail;
@@ -55,7 +53,6 @@ import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.toClassicTr
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
-import static org.quartz.impl.matchers.StringMatcher.StringOperatorName.EQUALS;
 
 /**
  *
@@ -100,7 +97,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private String instanceName;
   private boolean shutdownHazelcastOnShutdown = true;
 
-  public static final DateTimeFormatter FORMATTER = ISODateTimeFormat.basicDateTimeNoMillis();
 
   @Override
   public void initialize(ClassLoadHelper loadHelper, SchedulerSignaler signaler)
