@@ -64,7 +64,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   private static final Logger LOG = LoggerFactory.getLogger(HazelcastJobStore.class);
 
-  private static HazelcastInstance hazelcastClient;
+  protected static HazelcastInstance hazelcastClient;
 
   public static void setHazelcastClient(HazelcastInstance aHazelcastClient) {
 
@@ -113,13 +113,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     // initializing hazelcast maps
     LOG.debug("Initializing hazelcast maps...");
-    jobsByKey = hazelcastClient.getMap(HC_JOB_STORE_MAP_JOB);
-    triggersByKey = hazelcastClient.getMap(HC_JOB_STORE_TRIGGER_BY_KEY_MAP);
-    jobsByGroup = hazelcastClient.getMultiMap(HC_JOB_STORE_MAP_JOB_BY_GROUP_MAP);
-    triggersByGroup = hazelcastClient.getMultiMap(HC_JOB_STORE_TRIGGER_KEY_BY_GROUP_MAP);
-    pausedTriggerGroups = hazelcastClient.getSet(HC_JOB_STORE_PAUSED_TRIGGER_GROUPS);
-    pausedJobGroups = hazelcastClient.getSet(HC_JOB_STORE_PAUSED_JOB_GROUPS);
-    calendarsByName = hazelcastClient.getMap(HC_JOB_CALENDAR_MAP);
+    jobsByKey = getMap(HC_JOB_STORE_MAP_JOB);
+    triggersByKey = getMap(HC_JOB_STORE_TRIGGER_BY_KEY_MAP);
+    jobsByGroup = getMultiMap(HC_JOB_STORE_MAP_JOB_BY_GROUP_MAP);
+    triggersByGroup = getMultiMap(HC_JOB_STORE_TRIGGER_KEY_BY_GROUP_MAP);
+    pausedTriggerGroups = getSet(HC_JOB_STORE_PAUSED_TRIGGER_GROUPS);
+    pausedJobGroups = getSet(HC_JOB_STORE_PAUSED_JOB_GROUPS);
+    calendarsByName = getMap(HC_JOB_CALENDAR_MAP);
 
     triggersByKey.addIndex("nextFireTime", true);
 
@@ -469,30 +469,30 @@ public class HazelcastJobStore implements JobStore, Serializable {
     final String groupNameCompareValue = matcher.getCompareToValue();
 
     switch (operator) {
-    case EQUALS:
-      final Collection<JobKey> jobKeys = jobsByGroup.get(groupNameCompareValue);
-      if (jobKeys != null) {
-        outList = new HashSet<>();
-        for (JobKey jobKey : jobKeys) {
-          if (jobKey != null) {
-            outList.add(jobKey);
-          }
-        }
-      }
-      break;
-    default:
-      for (String groupName : jobsByGroup.keySet()) {
-        if (operator.evaluate(groupName, groupNameCompareValue)) {
-          if (outList == null) {
-            outList = new HashSet<>();
-          }
-          for (JobKey jobKey : jobsByGroup.get(groupName)) {
+      case EQUALS:
+        final Collection<JobKey> jobKeys = jobsByGroup.get(groupNameCompareValue);
+        if (jobKeys != null) {
+          outList = new HashSet<>();
+          for (JobKey jobKey : jobKeys) {
             if (jobKey != null) {
               outList.add(jobKey);
             }
           }
         }
-      }
+        break;
+      default:
+        for (String groupName : jobsByGroup.keySet()) {
+          if (operator.evaluate(groupName, groupNameCompareValue)) {
+            if (outList == null) {
+              outList = new HashSet<>();
+            }
+            for (JobKey jobKey : jobsByGroup.get(groupName)) {
+              if (jobKey != null) {
+                outList.add(jobKey);
+              }
+            }
+          }
+        }
     }
     return outList == null
         ? java.util.Collections.<JobKey> emptySet()
@@ -508,31 +508,31 @@ public class HazelcastJobStore implements JobStore, Serializable {
         .getCompareWithOperator();
     String groupNameCompareValue = matcher.getCompareToValue();
     switch (operator) {
-    case EQUALS:
-      Collection<TriggerKey> triggerKeys = triggersByGroup
-          .get(groupNameCompareValue);
-      if (triggerKeys != null) {
-        outList = newHashSet();
-        for (TriggerKey triggerKey : triggerKeys) {
-          if (triggerKey != null) {
-            outList.add(triggerKey);
-          }
-        }
-      }
-      break;
-    default:
-      for (String groupName : triggersByGroup.keySet()) {
-        if (operator.evaluate(groupName, groupNameCompareValue)) {
-          if (outList == null) {
-            outList = newHashSet();
-          }
-          for (TriggerKey triggerKey : triggersByGroup.get(groupName)) {
+      case EQUALS:
+        Collection<TriggerKey> triggerKeys = triggersByGroup
+            .get(groupNameCompareValue);
+        if (triggerKeys != null) {
+          outList = newHashSet();
+          for (TriggerKey triggerKey : triggerKeys) {
             if (triggerKey != null) {
               outList.add(triggerKey);
             }
           }
         }
-      }
+        break;
+      default:
+        for (String groupName : triggersByGroup.keySet()) {
+          if (operator.evaluate(groupName, groupNameCompareValue)) {
+            if (outList == null) {
+              outList = newHashSet();
+            }
+            for (TriggerKey triggerKey : triggersByGroup.get(groupName)) {
+              if (triggerKey != null) {
+                outList.add(triggerKey);
+              }
+            }
+          }
+        }
     }
     return outList == null
         ? java.util.Collections.<TriggerKey> emptySet()
@@ -638,19 +638,19 @@ public class HazelcastJobStore implements JobStore, Serializable {
     List<String> pausedGroups = new LinkedList<>();
     StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
     switch (operator) {
-    case EQUALS:
-      if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
-        pausedGroups.add(matcher.getCompareToValue());
-      }
-      break;
-    default:
-      for (String group : triggersByGroup.keySet()) {
-        if (operator.evaluate(group, matcher.getCompareToValue())) {
-          if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
-            pausedGroups.add(group);
+      case EQUALS:
+        if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
+          pausedGroups.add(matcher.getCompareToValue());
+        }
+        break;
+      default:
+        for (String group : triggersByGroup.keySet()) {
+          if (operator.evaluate(group, matcher.getCompareToValue())) {
+            if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
+              pausedGroups.add(group);
+            }
           }
         }
-      }
     }
 
     for (String pausedGroup : pausedGroups) {
@@ -738,19 +738,19 @@ public class HazelcastJobStore implements JobStore, Serializable {
     StringMatcher.StringOperatorName operator = groupMatcher
         .getCompareWithOperator();
     switch (operator) {
-    case EQUALS:
-      if (pausedJobGroups.add(groupMatcher.getCompareToValue())) {
-        pausedGroups.add(groupMatcher.getCompareToValue());
-      }
-      break;
-    default:
-      for (String jobGroup : jobsByGroup.keySet()) {
-        if (operator.evaluate(jobGroup, groupMatcher.getCompareToValue())) {
-          if (pausedJobGroups.add(jobGroup)) {
-            pausedGroups.add(jobGroup);
+      case EQUALS:
+        if (pausedJobGroups.add(groupMatcher.getCompareToValue())) {
+          pausedGroups.add(groupMatcher.getCompareToValue());
+        }
+        break;
+      default:
+        for (String jobGroup : jobsByGroup.keySet()) {
+          if (operator.evaluate(jobGroup, groupMatcher.getCompareToValue())) {
+            if (pausedJobGroups.add(jobGroup)) {
+              pausedGroups.add(jobGroup);
+            }
           }
         }
-      }
     }
 
     for (String groupName : pausedGroups) {
@@ -1220,6 +1220,18 @@ public class HazelcastJobStore implements JobStore, Serializable {
           "Try to increase your trigger release time threashold since quartz acquireNextTriggers in a 30000 interval");
     }
     this.triggerReleaseThreshold = triggerReleaseThreshold;
+  }
+
+  protected IMap getMap(String name) {
+    return hazelcastClient.getMap(name);
+  }
+
+  protected MultiMap getMultiMap(String name) {
+    return hazelcastClient.getMultiMap(name);
+  }
+
+  protected ISet getSet(String name) {
+    return hazelcastClient.getSet(name);
   }
 
 }
