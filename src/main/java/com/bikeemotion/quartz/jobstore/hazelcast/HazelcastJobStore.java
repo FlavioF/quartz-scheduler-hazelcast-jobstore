@@ -822,7 +822,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     List<OperableTrigger> result = new ArrayList<>();
     Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<>();
-    Set<TriggerWrapper> excludedTriggers = new HashSet<>();
 
     // ordering triggers to try to ensure firetime order
     List<TriggerWrapper> orderedTriggers = new ArrayList<>(triggersByKey.values(new TriggersPredicate(limit)));
