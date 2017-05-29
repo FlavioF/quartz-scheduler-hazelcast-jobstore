@@ -228,6 +228,25 @@ public class QuartzTest extends AbstractTest {
     assertEquals(MyJob.triggerKeys.poll(), "key1");
   }
 
+
+  @Test
+  public void testScheduleJobWithNoRepeatTime()
+          throws Exception {
+
+    JobDetail job1 = buildJob("Job11", DEFAULT_GROUP, MyJob.class);
+
+    final SimpleTriggerImpl o = (SimpleTriggerImpl) buildTrigger("key11", DEFAULT_GROUP, job1);
+    o.setRepeatInterval(100);
+    o.setRepeatCount(0);
+
+    scheduler.scheduleJob(job1, o);
+    // it really needs to wait to be sure that it is not found as a lost trigger
+    Thread.sleep(60000);
+
+    assertEquals(MyJob.count, 1);
+    assertEquals(MyJob.triggerKeys.poll(), "key11");
+  }
+
   @Test
   public void testScheduleJobWithRepeatTimeWithConcurrentExecutionDisallowed()
     throws Exception {
