@@ -1402,7 +1402,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     assertEquals(triggerFired.size(), 1);
 
     assertTrue(jobStore.checkExists(trigger1.getKey()));
-    assertEquals(jobStore.getTriggerState(trigger1.getKey()), Trigger.TriggerState.NORMAL);
+    assertEquals(jobStore.getTriggerState(trigger1.getKey()), Trigger.TriggerState.COMPLETE);
     jobStore.removeTrigger(trigger1.getKey());
   }
 

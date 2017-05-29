@@ -42,14 +42,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.ACQUIRED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.BLOCKED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.NORMAL;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.PAUSED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.PAUSED_BLOCKED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.STATE_COMPLETED;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.WAITING;
-import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.toClassicTriggerState;
+import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerState.*;
 import static com.bikeemotion.quartz.jobstore.hazelcast.TriggerWrapper.newTriggerWrapper;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
@@ -96,7 +89,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private String instanceId;
   private String instanceName;
   private boolean shutdownHazelcastOnShutdown = true;
-
 
   @Override
   public void initialize(ClassLoadHelper loadHelper, SchedulerSignaler signaler)
@@ -882,7 +874,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         if (job == null) {
           LOG.debug("Job not found");
           continue;
-        } else if(job.isConcurrentExectionDisallowed()) {
+        } else if (job.isConcurrentExectionDisallowed()) {
           if (acquiredJobKeysForNoConcurrentExec.contains(jobKey)) {
             continue; // go to next trigger in queue.
           } else {
@@ -975,14 +967,16 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
           tw = newTriggerWrapper(trigger, ACQUIRED);
 
+        } else if (!tw.trigger.mayFireAgain()) {
+
+          tw = newTriggerWrapper(trigger, COMPLETE);
+
         } else {
+
           tw = newTriggerWrapper(trigger, WAITING);
         }
-        
-        
-        if (tw.trigger.getNextFireTime() != null) {
-          storeTriggerWrapper(tw);
-        }
+
+        storeTriggerWrapper(tw);
 
         TriggerFiredBundle bndle = new TriggerFiredBundle(
             retrieveJob(tw.jobKey),
