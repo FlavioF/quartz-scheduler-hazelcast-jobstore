@@ -957,11 +957,15 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
           ArrayList<TriggerWrapper> trigs = getTriggerWrappersForJob(job.getKey());
           for (TriggerWrapper ttw : trigs) {
+            // Block all triggers
+
             if (ttw.getState() == WAITING) {
               ttw = newTriggerWrapper(ttw, BLOCKED);
             } else if (ttw.getState() == PAUSED) {
               ttw = newTriggerWrapper(ttw, PAUSED_BLOCKED);
             }
+            storeTriggerWrapper(ttw);
+
           }
 
           tw = newTriggerWrapper(trigger, ACQUIRED);
@@ -1026,6 +1030,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       ArrayList<TriggerWrapper> trigs = getTriggerWrappersForJob(jobDetail.getKey());
 
       for (TriggerWrapper ttw : trigs) {
+        // unblock all triggers
         if (ttw.getState() == BLOCKED || ttw.getState() == ACQUIRED) {
           storeTriggerWrapper(newTriggerWrapper(ttw, WAITING));
         } else if (ttw.getState() == PAUSED_BLOCKED) {
