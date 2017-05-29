@@ -1383,6 +1383,7 @@ public class HazelcastJobStoreTest extends AbstractTest {
     long baseFireTime = DateBuilder.newDate().build().getTime();
 
     JobDetail newJob = JobBuilder.newJob(NoOpJob.class).withIdentity("job1", "testTriggersFired").build();
+
     jobStore.storeJob(newJob, false);
 
     OperableTrigger trigger1 = buildAndComputeTrigger("triggerFired1",

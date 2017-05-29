@@ -267,6 +267,25 @@ public class QuartzTest extends AbstractTest {
   }
 
   @Test
+  public void testScheduleJobWithRepeatTimeWithConcurrentExecutionDisallowedAfterEnd()
+          throws Exception {
+
+    JobDetail job1 = buildJob("CJob1", DEFAULT_GROUP, MyNoConcurrentJob.class);
+    final SimpleTriggerImpl o = (SimpleTriggerImpl) buildTrigger("Ckey1", DEFAULT_GROUP, job1);
+    o.setRepeatInterval(100);
+    o.setRepeatCount(1);
+
+    MyNoConcurrentJob.waitTime = 200;
+
+    scheduler.scheduleJob(job1, o);
+    Thread.sleep(750);
+
+    // since MyNoCocurrent job takes 300 ms to finish
+    assertEquals(MyNoConcurrentJob.count, 2);
+    assertEquals(MyNoConcurrentJob.triggerKeys.poll(), "Ckey1");
+  }
+
+  @Test
   public void testScheduleJobWithRepeatTimeWithConcurrentExecutionDisallowed_withFastJob()
     throws Exception {
 
