@@ -9,7 +9,7 @@
 
     <groupId>com.bikeemotion</groupId>
     <artifactId>quartz-hazelcast-jobstore</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5-SNAPSHOT</version>
     <packaging>bundle</packaging>
   
     <name>Quartz Hazelcast JobStore</name>
