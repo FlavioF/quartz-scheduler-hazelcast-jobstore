@@ -31,9 +31,11 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   private static final Logger LOG = LoggerFactory.getLogger(HazelcastJobStore.class);
 
-  protected static boolean isHazelcastClient;
+  protected static boolean isHazelcastClient = false;
 
   protected static HazelcastInstance hazelcastInstance;
+
+  protected static String distributedObjectQualifier = "";
 
   public static void setHazelcastClient(HazelcastInstance hazelcastClient) {
     isHazelcastClient = true;
@@ -45,13 +47,21 @@ public class HazelcastJobStore implements JobStore, Serializable {
     hazelcastInstance = hazelcastServer;
   }
 
-  private final String HC_JOB_STORE_MAP_JOB = "job-store-map-job";
-  private final String HC_JOB_STORE_MAP_JOB_BY_GROUP_MAP = "job-store-map-job-by-group-map";
-  private final String HC_JOB_STORE_TRIGGER_BY_KEY_MAP = "job-store-trigger-by-key-map";
-  private final String HC_JOB_STORE_TRIGGER_KEY_BY_GROUP_MAP = "job-trigger-key-by-group-map";
-  private final String HC_JOB_STORE_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
-  private final String HC_JOB_STORE_PAUSED_JOB_GROUPS = "job-paused-job-groups";
-  private final String HC_JOB_CALENDAR_MAP = "job-calendar-map";
+  public static void setDistributedObjectQualifier(String qualifier) {
+    distributedObjectQualifier = qualifier;
+  }
+
+  public static String getQualifiedDistributedObjectName(String distributedObjectName) {
+    return distributedObjectQualifier + distributedObjectName;
+  }
+
+  public final String MAP_JOBS_BY_KEY = "job-store-map-job";
+  public final String MAP_TRIGGERS_BY_KEY = "job-store-trigger-by-key-map";
+  public final String MULTIMAP_JOBS_BY_GROUP = "job-store-map-job-by-group-map";
+  public final String MULTIMAP_TRIGGERS_BY_GROUP = "job-trigger-key-by-group-map";
+  public final String SET_PAUSED_JOB_GROUPS = "job-paused-job-groups";
+  public final String SET_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
+  public final String MAP_CALENDARS_BY_NAME = "job-calendar-map";
 
   private static long ftrCtr = System.currentTimeMillis();
 
@@ -60,9 +70,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private IMap<TriggerKey, TriggerWrapper> triggersByKey;
   private MultiMap<String, JobKey> jobsByGroup;
   private MultiMap<String, TriggerKey> triggersByGroup;
-  private IMap<String, Calendar> calendarsByName;
-  private ISet<String> pausedTriggerGroups;
   private ISet<String> pausedJobGroups;
+  private ISet<String> pausedTriggerGroups;
+  private IMap<String, Calendar> calendarsByName;
   private volatile boolean schedulerRunning = false;
   private long misfireThreshold = 5000;
   private long triggerReleaseThreshold = 60000;
@@ -86,13 +96,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
     // initializing hazelcast maps
     LOG.debug("Initializing hazelcast maps...");
-    jobsByKey = getMap(HC_JOB_STORE_MAP_JOB);
-    triggersByKey = getMap(HC_JOB_STORE_TRIGGER_BY_KEY_MAP);
-    jobsByGroup = getMultiMap(HC_JOB_STORE_MAP_JOB_BY_GROUP_MAP);
-    triggersByGroup = getMultiMap(HC_JOB_STORE_TRIGGER_KEY_BY_GROUP_MAP);
-    pausedTriggerGroups = getSet(HC_JOB_STORE_PAUSED_TRIGGER_GROUPS);
-    pausedJobGroups = getSet(HC_JOB_STORE_PAUSED_JOB_GROUPS);
-    calendarsByName = getMap(HC_JOB_CALENDAR_MAP);
+    jobsByKey = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_JOBS_BY_KEY));
+    triggersByKey = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_TRIGGERS_BY_KEY));
+    jobsByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTIMAP_JOBS_BY_GROUP));
+    triggersByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTIMAP_TRIGGERS_BY_GROUP));
+    pausedJobGroups = hazelcastInstance.getSet(getQualifiedDistributedObjectName(SET_PAUSED_JOB_GROUPS));
+    pausedTriggerGroups = hazelcastInstance.getSet(getQualifiedDistributedObjectName(SET_PAUSED_TRIGGER_GROUPS));
+    calendarsByName = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_CALENDARS_BY_NAME));
 
     triggersByKey.addIndex("nextFireTime", true);
 
@@ -1195,18 +1205,6 @@ public class HazelcastJobStore implements JobStore, Serializable {
           "Try to increase your trigger release time threashold since quartz acquireNextTriggers in a 30000 interval");
     }
     this.triggerReleaseThreshold = triggerReleaseThreshold;
-  }
-
-  protected IMap getMap(String name) {
-    return hazelcastInstance.getMap(name);
-  }
-
-  protected MultiMap getMultiMap(String name) {
-    return hazelcastInstance.getMultiMap(name);
-  }
-
-  protected ISet getSet(String name) {
-    return hazelcastInstance.getSet(name);
   }
 
 }
