@@ -1,6 +1,9 @@
 package com.bikeemotion.quartz.jobstore.hazelcast;
 
-import com.hazelcast.core.*;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
+import com.hazelcast.core.MultiMap;
 import com.hazelcast.query.Predicate;
 import org.quartz.Calendar;
 import org.quartz.*;
@@ -59,8 +62,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public final String MAP_TRIGGERS_BY_KEY = "job-store-trigger-by-key-map";
   public final String MULTIMAP_JOBS_BY_GROUP = "job-store-map-job-by-group-map";
   public final String MULTIMAP_TRIGGERS_BY_GROUP = "job-trigger-key-by-group-map";
-  public final String SET_PAUSED_JOB_GROUPS = "job-paused-job-groups";
-  public final String SET_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
+  public final String MAP_PAUSED_JOB_GROUPS = "job-paused-job-groups";
+  public final String MAP_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
   public final String MAP_CALENDARS_BY_NAME = "job-calendar-map";
 
   private static long ftrCtr = System.currentTimeMillis();
@@ -70,8 +73,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
   private IMap<TriggerKey, TriggerWrapper> triggersByKey;
   private MultiMap<String, JobKey> jobsByGroup;
   private MultiMap<String, TriggerKey> triggersByGroup;
-  private ISet<String> pausedJobGroups;
-  private ISet<String> pausedTriggerGroups;
+  private IMap<String, Boolean> pausedJobGroups;
+  private IMap<String, Boolean> pausedTriggerGroups;
   private IMap<String, Calendar> calendarsByName;
   private volatile boolean schedulerRunning = false;
   private long misfireThreshold = 5000;
@@ -100,8 +103,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
     triggersByKey = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_TRIGGERS_BY_KEY));
     jobsByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTIMAP_JOBS_BY_GROUP));
     triggersByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTIMAP_TRIGGERS_BY_GROUP));
-    pausedJobGroups = hazelcastInstance.getSet(getQualifiedDistributedObjectName(SET_PAUSED_JOB_GROUPS));
-    pausedTriggerGroups = hazelcastInstance.getSet(getQualifiedDistributedObjectName(SET_PAUSED_TRIGGER_GROUPS));
+    pausedJobGroups = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_PAUSED_JOB_GROUPS));
+    pausedTriggerGroups = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_PAUSED_TRIGGER_GROUPS));
     calendarsByName = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_CALENDARS_BY_NAME));
 
     triggersByKey.addIndex("nextFireTime", true);
@@ -296,8 +299,9 @@ public class HazelcastJobStore implements JobStore, Serializable {
             + ") referenced by the trigger does not exist.");
       }
 
-      boolean shouldBePaused = pausedJobGroups.contains(newTrigger.getJobKey()
-          .getGroup()) || pausedTriggerGroups.contains(triggerKey.getGroup());
+      boolean shouldBePaused =
+          pausedJobGroups.containsKey(newTrigger.getJobKey().getGroup()) ||
+              pausedTriggerGroups.containsKey(triggerKey.getGroup());
       final TriggerState state = shouldBePaused
           ? PAUSED
           : NORMAL;
@@ -622,14 +626,14 @@ public class HazelcastJobStore implements JobStore, Serializable {
     StringMatcher.StringOperatorName operator = matcher.getCompareWithOperator();
     switch (operator) {
       case EQUALS:
-        if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
+        if (pausedTriggerGroups.put(matcher.getCompareToValue(), Boolean.TRUE) == null) {
           pausedGroups.add(matcher.getCompareToValue());
         }
         break;
       default:
         for (String group : triggersByGroup.keySet()) {
           if (operator.evaluate(group, matcher.getCompareToValue())) {
-            if (pausedTriggerGroups.add(matcher.getCompareToValue())) {
+            if (pausedTriggerGroups.put(group, Boolean.TRUE) == null) {
               pausedGroups.add(group);
             }
           }
@@ -656,7 +660,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
       TriggerWrapper tw = triggersByKey.get(triggerKey);
       OperableTrigger trigger = tw.getTrigger();
       String jobGroup = trigger.getJobKey().getGroup();
-      if (pausedJobGroups.contains(jobGroup)) {
+      if (pausedJobGroups.containsKey(jobGroup)) {
         continue;
       }
       resumeTrigger(triggerKey);
@@ -722,14 +726,14 @@ public class HazelcastJobStore implements JobStore, Serializable {
         .getCompareWithOperator();
     switch (operator) {
       case EQUALS:
-        if (pausedJobGroups.add(groupMatcher.getCompareToValue())) {
+        if (pausedJobGroups.put(groupMatcher.getCompareToValue(), Boolean.TRUE) == null) {
           pausedGroups.add(groupMatcher.getCompareToValue());
         }
         break;
       default:
         for (String jobGroup : jobsByGroup.keySet()) {
           if (operator.evaluate(jobGroup, groupMatcher.getCompareToValue())) {
-            if (pausedJobGroups.add(jobGroup)) {
+            if (pausedJobGroups.put(jobGroup, Boolean.TRUE) == null) {
               pausedGroups.add(jobGroup);
             }
           }
@@ -764,7 +768,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public Set<String> getPausedTriggerGroups()
       throws JobPersistenceException {
 
-    return new HashSet<>(pausedTriggerGroups);
+    return new HashSet<>(pausedTriggerGroups.keySet());
   }
 
   @Override
