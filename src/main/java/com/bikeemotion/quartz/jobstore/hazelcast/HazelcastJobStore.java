@@ -58,13 +58,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
     return distributedObjectQualifier + distributedObjectName;
   }
 
-  public final String MAP_JOBS_BY_KEY = "job-store-map-job";
-  public final String MAP_TRIGGERS_BY_KEY = "job-store-trigger-by-key-map";
-  public final String MULTI_MAP_JOBS_BY_GROUP = "job-store-map-job-by-group-map";
-  public final String MULTI_MAP_TRIGGERS_BY_GROUP = "job-trigger-key-by-group-map";
-  public final String MAP_PAUSED_JOB_GROUPS = "job-paused-job-groups";
-  public final String MAP_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
-  public final String MAP_CALENDARS_BY_NAME = "job-calendar-map";
+  public static final String MAP_JOBS_BY_KEY = "job-store-map-job";
+  public static final String MAP_TRIGGERS_BY_KEY = "job-store-trigger-by-key-map";
+  public static final String MULTI_MAP_JOBS_BY_GROUP = "job-store-map-job-by-group-map";
+  public static final String MULTI_MAP_TRIGGERS_BY_GROUP = "job-trigger-key-by-group-map";
+  public static final String MAP_PAUSED_JOB_GROUPS = "job-paused-job-groups";
+  public static final String MAP_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
+  public static final String MAP_CALENDARS_BY_NAME = "job-calendar-map";
 
   private static long ftrCtr = System.currentTimeMillis();
 
