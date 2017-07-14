@@ -60,8 +60,8 @@ public class HazelcastJobStore implements JobStore, Serializable {
 
   public final String MAP_JOBS_BY_KEY = "job-store-map-job";
   public final String MAP_TRIGGERS_BY_KEY = "job-store-trigger-by-key-map";
-  public final String MULTIMAP_JOBS_BY_GROUP = "job-store-map-job-by-group-map";
-  public final String MULTIMAP_TRIGGERS_BY_GROUP = "job-trigger-key-by-group-map";
+  public final String MULTI_MAP_JOBS_BY_GROUP = "job-store-map-job-by-group-map";
+  public final String MULTI_MAP_TRIGGERS_BY_GROUP = "job-trigger-key-by-group-map";
   public final String MAP_PAUSED_JOB_GROUPS = "job-paused-job-groups";
   public final String MAP_PAUSED_TRIGGER_GROUPS = "job-paused-trigger-groups";
   public final String MAP_CALENDARS_BY_NAME = "job-calendar-map";
@@ -101,11 +101,20 @@ public class HazelcastJobStore implements JobStore, Serializable {
     LOG.debug("Initializing hazelcast maps...");
     jobsByKey = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_JOBS_BY_KEY));
     triggersByKey = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_TRIGGERS_BY_KEY));
-    jobsByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTIMAP_JOBS_BY_GROUP));
-    triggersByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTIMAP_TRIGGERS_BY_GROUP));
+    jobsByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTI_MAP_JOBS_BY_GROUP));
+    triggersByGroup = hazelcastInstance.getMultiMap(getQualifiedDistributedObjectName(MULTI_MAP_TRIGGERS_BY_GROUP));
     pausedJobGroups = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_PAUSED_JOB_GROUPS));
     pausedTriggerGroups = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_PAUSED_TRIGGER_GROUPS));
     calendarsByName = hazelcastInstance.getMap(getQualifiedDistributedObjectName(MAP_CALENDARS_BY_NAME));
+
+    // rebuilding multi maps after total restart
+    if (jobsByGroup.size() == 0) {
+      jobsByKey.keySet().forEach(jobKey -> jobsByGroup.put(jobKey.getGroup(), jobKey));
+    }
+
+    if (triggersByGroup.size() == 0) {
+      triggersByKey.keySet().forEach(triggerKey -> triggersByGroup.put(triggerKey.getGroup(), triggerKey));
+    }
 
     triggersByKey.addIndex("nextFireTime", true);
 
