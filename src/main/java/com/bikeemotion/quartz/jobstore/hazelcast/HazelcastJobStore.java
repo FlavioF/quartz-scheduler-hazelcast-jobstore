@@ -280,10 +280,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public JobDetail retrieveJob(final JobKey jobKey)
     throws JobPersistenceException {
 
-    return jobKey != null && jobsByKey.containsKey(jobKey)
-        ? (JobDetail) jobsByKey
-            .get(jobKey).clone()
-        : null;
+    if (jobKey != null) {
+      JobDetail jobDetail = jobsByKey.get(jobKey);
+      if (jobDetail != null) {
+        return (JobDetail) jobDetail.clone();
+      }
+    }
+    return null;
   }
 
   @Override
