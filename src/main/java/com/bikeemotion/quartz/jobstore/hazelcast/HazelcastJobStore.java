@@ -280,10 +280,13 @@ public class HazelcastJobStore implements JobStore, Serializable {
   public JobDetail retrieveJob(final JobKey jobKey)
     throws JobPersistenceException {
 
-    return jobKey != null && jobsByKey.containsKey(jobKey)
-        ? (JobDetail) jobsByKey
-            .get(jobKey).clone()
-        : null;
+    if (jobKey != null) {
+      JobDetail jobDetail = jobsByKey.get(jobKey);
+      if (jobDetail != null) {
+        return (JobDetail) jobDetail.clone();
+      }
+    }
+    return null;
   }
 
   @Override
@@ -819,7 +822,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
     }
 
     long limit = noLaterThan + timeWindow;
-
+    
     List<OperableTrigger> result = new ArrayList<>();
     Set<JobKey> acquiredJobKeysForNoConcurrentExec = new HashSet<>();
 
@@ -1183,7 +1186,7 @@ public class HazelcastJobStore implements JobStore, Serializable {
         if (removeOrphanedJob) {
           JobDetail job = jobsByKey.get(tw.jobKey);
           List<OperableTrigger> trigs = getTriggersForJob(tw.jobKey);
-          if ((trigs == null || trigs.isEmpty()) && !job.isDurable()) {
+          if ((trigs == null || trigs.isEmpty()) && (job != null && !job.isDurable())) {
             if (removeJob(job.getKey())) {
               schedSignaler.notifySchedulerListenersJobDeleted(job.getKey());
             }
